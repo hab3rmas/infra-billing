@@ -19,6 +19,7 @@ export const FORK_API = {
 /** Method sub-paths within a controller. */
 export const FORK_API_SUB = {
   TOPOLOGY_MAPS: 'maps',
+  TOPOLOGY_MAP_IMPORT: 'maps/import',
   TOPOLOGY_MAP_BY_ID: `maps/${ID}`,
   TOPOLOGY_MAP_DUPLICATE: `maps/${ID}/duplicate`,
   TOPOLOGY_MAP_SEED: `maps/${ID}/seed-from-services`,
@@ -53,6 +54,7 @@ const pathId = (controller: string, sub: string, uuid: string): string =>
 export const FORK_API_PATH = {
   TOPOLOGY: {
     MAPS: path(FORK_API.TOPOLOGY, FORK_API_SUB.TOPOLOGY_MAPS),
+    MAP_IMPORT: path(FORK_API.TOPOLOGY, FORK_API_SUB.TOPOLOGY_MAP_IMPORT),
     MAP: (uuid: string) => pathId(FORK_API.TOPOLOGY, FORK_API_SUB.TOPOLOGY_MAP_BY_ID, uuid),
     MAP_DUPLICATE: (uuid: string) =>
       pathId(FORK_API.TOPOLOGY, FORK_API_SUB.TOPOLOGY_MAP_DUPLICATE, uuid),

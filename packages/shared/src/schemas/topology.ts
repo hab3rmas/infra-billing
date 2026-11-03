@@ -217,6 +217,11 @@ const nodeEditable = z.object({
   sshPort: sshPortSchema.nullable().describe('SSH port'),
   sshUser: sshUserSchema.nullable().describe('SSH user'),
   tabbyProfile: tabbyProfileNameSchema.nullable().describe('Tabby profile name'),
+  countryCode: z
+    .string()
+    .regex(/^[A-Z]{2}$/, 'ISO 3166-1 alpha-2')
+    .nullable()
+    .describe('Country shown as a flag on a node without a billing service'),
 });
 
 export const createTopologyNodeSchema = nodeEditable.partial().extend({
@@ -359,3 +364,52 @@ export const adoptTabbyProfilesResultSchema = z.object({
   updated: z.number().int().nonnegative().describe('Nodes that got a tabbyProfile name'),
 });
 export type AdoptTabbyProfilesResult = z.infer<typeof adoptTabbyProfilesResultSchema>;
+
+// ---- import / export of a map ---------------------------------------------
+
+/** A map as a portable JSON document (the `Export` menu writes it, `POST /topology/maps/import` reads it). */
+export const topologyMapDocumentSchema = z.object({
+  version: z.literal(1),
+  name: z.string().min(1).max(100),
+  preset: topologyPresetSchema.default('custom'),
+  nodes: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(64).describe('Id inside this document'),
+        kind: z.enum(['service', 'external', 'group', 'remnawave']),
+        role: topologyNodeRoleSchema,
+        label: z.string().max(100).nullable(),
+        serviceUuid: uuidSchema.nullable().describe('Kept when that service still exists'),
+        parentId: z.string().max(64).nullable(),
+        addresses: z.array(topologyAddressSchema).max(50),
+        posX: posSchema.nullable(),
+        posY: posSchema.nullable(),
+        hidden: z.boolean().default(false),
+        sshHost: sshHostSchema.nullable().default(null),
+        sshPort: sshPortSchema.nullable().default(null),
+        sshUser: sshUserSchema.nullable().default(null),
+        tabbyProfile: tabbyProfileNameSchema.nullable().default(null),
+        countryCode: z
+          .string()
+          .regex(/^[A-Z]{2}$/)
+          .nullable()
+          .default(null),
+      }),
+    )
+    .max(2000),
+  links: z
+    .array(
+      z.object({
+        from: z.string().min(1).max(64),
+        to: z.string().min(1).max(64),
+        kind: topologyLinkKindSchema,
+        label: z.string().max(100).nullable(),
+        route: z.number().int().min(0).max(999).nullable(),
+        protocol: z.string().max(50).nullable(),
+        animated: z.boolean().default(true),
+        hidden: z.boolean().default(false),
+      }),
+    )
+    .max(5000),
+});
+export type TopologyMapDocument = z.infer<typeof topologyMapDocumentSchema>;

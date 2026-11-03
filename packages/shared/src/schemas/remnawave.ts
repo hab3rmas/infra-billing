@@ -30,6 +30,7 @@ export const remnawaveIntegrationSchema = z.object({
   autoSync: z.boolean().describe('Sync together with the providers'),
   lastSyncAt: isoDateSchema.nullable().describe('Last sync'),
   lastSyncError: z.string().nullable().describe('Last sync error'),
+  lastWarnings: z.array(z.string()).describe('Warnings of the last sync (unmatched nodes, …)'),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 });
