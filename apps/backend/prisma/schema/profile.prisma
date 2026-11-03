@@ -1,0 +1,34 @@
+// A workspace: VPN, Site 1, Site 2… Groups one or more projects.
+model Profile {
+  uuid               String   @id @default(uuid()) @map("uuid")
+  name               String   @map("name")
+  slug               String   @unique @map("slug")     // for ?profile=<slug> deep links
+  iconName           String?  @map("icon_name")        // same appearance fields as Project
+  iconBg             String?  @map("icon_bg")
+  faviconLink        String?  @map("favicon_link")
+  sortOrder          Int      @default(0) @map("sort_order")
+  defaultProjectUuid String?  @map("default_project_uuid") // new services created in this profile land here
+  // Telegram overrides (null = use the global chat/topic from upstream Settings).
+  notificationsEnabled Boolean @default(true) @map("notifications_enabled")
+  telegramChatId     String?  @map("telegram_chat_id")
+  telegramTopicId    String?  @map("telegram_topic_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  projects ProfileProject[]
+  maps     TopologyMap[]
+
+  @@map("profiles")
+}
+
+// A project belongs to at most one profile. Projects without a profile show only in "All".
+model ProfileProject {
+  projectUuid String  @id @map("project_uuid")
+  profileUuid String  @map("profile_uuid")
+
+  project Project @relation(fields: [projectUuid], references: [uuid], onDelete: Cascade)
+  profile Profile @relation(fields: [profileUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([profileUuid], map: "profile_projects_profile_uuid_idx")
+  @@map("profile_projects")
+}

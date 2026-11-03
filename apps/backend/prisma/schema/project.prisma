@@ -12,6 +12,7 @@ model Project {
   services Service[]
   topologyMaps    TopologyMap[]           // fork:topology
   accountDefaults AccountDefaultProject[] // fork:topology
+  profileProject  ProfileProject?         // fork:topology
 
   @@map("projects")
 }

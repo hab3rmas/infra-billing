@@ -12,6 +12,7 @@ model TopologyMap {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  profile      Profile?               @relation(fields: [profileUuid], references: [uuid], onDelete: SetNull)
   project      Project?               @relation(fields: [projectUuid], references: [uuid], onDelete: SetNull)
   nodes        TopologyNode[]
   links        TopologyLink[]

@@ -13,6 +13,7 @@ import type {
   TopologyNode as TopologyNodeDto,
   TopologySettings as TopologySettingsDto,
 } from '@infra/shared';
+import { currentProfileScope } from '../profiles/profile-scope';
 import { TopologyLinksRepository } from '@repositories/topology/topology-links.repository';
 import { TopologyMapsRepository } from '@repositories/topology/topology-maps.repository';
 import { TopologyNodesRepository } from '@repositories/topology/topology-nodes.repository';
@@ -62,6 +63,8 @@ export class TopologyService {
         name: dto.name,
         preset: dto.preset,
         projectUuid: dto.projectUuid ?? null,
+        // Inside a profile the map belongs to it; in "All" it stays unassigned.
+        profileUuid: currentProfileScope()?.profileUuid ?? null,
         sortOrder: (last?.sortOrder ?? -1) + 1,
       },
       dto.createProject?.name,

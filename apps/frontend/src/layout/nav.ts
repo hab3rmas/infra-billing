@@ -2,6 +2,7 @@ import {
   type Icon,
   IconFolders,
   IconKey,
+  IconLayersSubtract,
   IconLayoutDashboard,
   IconReceipt2,
   IconServer2,
@@ -38,6 +39,7 @@ export const NAV: { sectionKey: string; items: NavItem[] }[] = [
       { to: '/settings', labelKey: 'nav.settingsItem', icon: IconSettings, end: true },
       { to: '/settings/auth', labelKey: 'nav.authItem', icon: IconShieldLock },
       { to: '/settings/tokens', labelKey: 'nav.tokensItem', icon: IconKey },
+      { to: '/settings/profiles', labelKey: 'profiles.navItem', icon: IconLayersSubtract }, // fork:topology
     ],
   },
 ];

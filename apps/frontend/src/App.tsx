@@ -19,6 +19,7 @@ import { PaymentsPage } from './pages/payments/PaymentsPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { AuthSettingsPage } from './pages/auth-settings/AuthSettingsPage';
 import { TokensPage } from './pages/TokensPage';
+import { ProfilesSettingsPage } from './pages/settings-profiles/ProfilesSettingsPage'; // fork:topology
 
 // Relative dates ("3 days ago") for the build badge; the locale is switched per render below.
 dayjs.extend(relativeTime);
@@ -50,6 +51,8 @@ export default function App() {
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="settings/auth" element={<AuthSettingsPage />} />
                   <Route path="settings/tokens" element={<TokensPage />} />
+                  {/* fork:topology */}
+                  <Route path="settings/profiles" element={<ProfilesSettingsPage />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

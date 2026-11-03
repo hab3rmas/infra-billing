@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { polyfillCountryFlagEmojis } from 'country-flag-emoji-polyfill';
 import App from './App';
 import './i18n';
+import './lib/profileScope'; // fork:topology
 
 import './index.css';
 import '@fontsource/golos-text/400.css';

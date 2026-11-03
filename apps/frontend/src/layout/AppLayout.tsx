@@ -9,6 +9,7 @@ import { IconColorsSwitcher } from '@/components/IconColorsSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { RwpPromo } from '@/components/RwpPromo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ProfileBadge, ProfileSwitcher } from '@/components/fork/ProfileSwitcher'; // fork:topology
 import {
   Sidebar,
   SidebarContent,
@@ -62,6 +63,8 @@ function HeaderBar() {
             /
           </span>
           <span ref={setTitle} className="flex min-w-0" />
+          {/* fork:topology */}
+          <ProfileBadge />
         </nav>
       </div>
       <div
@@ -103,6 +106,8 @@ export function AppLayout() {
           <SidebarHeader className="gap-3 px-4 pt-5 pb-3">
             <BrandWordmark className="px-1" />
             <UserBlock />
+            {/* fork:topology */}
+            <ProfileSwitcher />
             <SearchField onOpen={() => setPaletteOpen(true)} />
           </SidebarHeader>
           <SidebarContent className="gap-1 px-3">
