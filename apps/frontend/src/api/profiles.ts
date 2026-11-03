@@ -6,6 +6,7 @@ import {
   type ProfileTestResult,
   type ProfilesConfig,
   PROFILE_HEADER,
+  type TopologyMap,
   type UpdateProfile,
 } from '@infra/shared';
 import type { Project } from '@infra/shared';
@@ -32,6 +33,19 @@ export function useAllProjects() {
     queryFn: async () =>
       (await api.get<Project[]>(API_PATH.PROJECTS.ROOT, { headers: { [PROFILE_HEADER]: 'all' } }))
         .data,
+  });
+}
+
+/** Maps of every profile, ignoring the active one (profile management only). */
+export function useAllMaps() {
+  return useQuery({
+    queryKey: [...PROFILES_KEY, 'all-maps'],
+    queryFn: async () =>
+      (
+        await api.get<TopologyMap[]>(FORK_API_PATH.TOPOLOGY.MAPS, {
+          headers: { [PROFILE_HEADER]: 'all' },
+        })
+      ).data,
   });
 }
 
@@ -72,8 +86,8 @@ export function useSetProfileProjects() {
 export function useDeleteProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (uuid: string) => {
-      await api.delete(FORK_API_PATH.PROFILES.BY_ID(uuid));
+    mutationFn: async ({ uuid, moveMapsTo }: { uuid: string; moveMapsTo?: string }) => {
+      await api.delete(FORK_API_PATH.PROFILES.BY_ID(uuid), { params: { moveMapsTo } });
     },
     onSuccess: () => invalidateAll(qc),
   });

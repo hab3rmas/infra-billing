@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -17,6 +18,7 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { FORK_API, FORK_API_SUB, FORK_CONTROLLERS_INFO, ID_PARAM } from '@infra/shared';
@@ -82,8 +84,12 @@ export class ProfilesController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a profile (projects and services are kept)' })
   @ApiNoContentResponse()
-  remove(@Param(ID_PARAM, ParseUUIDPipe) uuid: string) {
-    return this.profiles.remove(uuid);
+  @ApiQuery({ name: 'moveMapsTo', required: false, type: String })
+  remove(
+    @Param(ID_PARAM, ParseUUIDPipe) uuid: string,
+    @Query('moveMapsTo', new ParseUUIDPipe({ optional: true })) moveMapsTo?: string,
+  ) {
+    return this.profiles.remove(uuid, moveMapsTo);
   }
 
   @Post(FORK_API_SUB.PROFILE_TEST)

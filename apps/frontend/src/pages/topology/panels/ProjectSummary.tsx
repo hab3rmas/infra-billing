@@ -11,13 +11,11 @@ import { formatMoney } from '@/utils/format';
 // when billed servers of the project are missing from the map.
 export function ProjectSummary({
   graph,
-  onSeed,
-  seeding,
+  onReview,
   editable,
 }: {
   graph: TopologyGraph;
-  onSeed: () => void;
-  seeding: boolean;
+  onReview: () => void;
   editable: boolean;
 }) {
   const { t } = useTranslation();
@@ -60,8 +58,8 @@ export function ProjectSummary({
             <div className="flex items-center justify-between gap-2 pt-1">
               <span className="text-warn">{t('topology.missingServices', { count: missing })}</span>
               {editable && (
-                <Button size="sm" variant="ghost" onClick={onSeed} disabled={seeding}>
-                  {t('topology.add')}
+                <Button size="sm" variant="ghost" onClick={onReview}>
+                  {t('topology.review')}
                 </Button>
               )}
             </div>

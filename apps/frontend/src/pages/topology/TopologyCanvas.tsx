@@ -40,7 +40,7 @@ import { notifyError } from '@/utils/notify';
 import { TopologyActionsContext } from './context';
 import { exportGraphImage } from './exportImage';
 import { TrafficEdge } from './edges/TrafficEdge';
-import { type TopoEdgeData, type TopoNodeData, buildFlow, chainOf } from './graph';
+import { type MapFilter, type TopoEdgeData, type TopoNodeData, buildFlow, chainOf } from './graph';
 import { type Positions, layoutNodes, nodesNeedingLayout } from './layout';
 import { ExternalNode } from './nodes/ExternalNode';
 import { GroupNode } from './nodes/GroupNode';
@@ -61,16 +61,19 @@ export interface CanvasControl {
   /** Centre the view on one node (node search). */
   focusNode: (uuid: string) => void;
   exportImage: (format: 'png' | 'svg') => Promise<void>;
+  /** Keep a chain (a route) highlighted until the pane is clicked; null clears it. */
+  pinChain: (chain: { nodes: Set<string>; edges: Set<string> } | null) => void;
 }
 
 interface Props {
   graph: TopologyGraph;
   showService: boolean;
+  filter: MapFilter;
   controlRef: RefObject<CanvasControl | null>;
   onOpenNode: (uuid: string) => void;
   onLink: (state: LinkDialogState) => void;
-  onSeed: () => void;
-  seeding: boolean;
+  /** Opens the "unlinked servers" review from the project card. */
+  onReview: () => void;
 }
 
 export function TopologyCanvas(props: Props) {
@@ -81,7 +84,7 @@ export function TopologyCanvas(props: Props) {
   );
 }
 
-function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, seeding }: Props) {
+function Canvas({ graph, showService, filter, controlRef, onOpenNode, onLink, onReview }: Props) {
   const { t } = useTranslation();
   const { resolved } = useTheme();
   const isMobile = useIsMobile();
@@ -98,6 +101,7 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
   const [hover, setHover] = useState<string | null>(null);
   // Picked through search: highlighted like a hover until the pane is clicked.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<{ nodes: Set<string>; edges: Set<string> } | null>(null);
   const [nodes, setNodes] = useState<Node<TopoNodeData>[]>([]);
 
   // Nodes without saved coordinates get an elk layout once; it is saved so it stays put afterwards.
@@ -125,20 +129,24 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
 
   // Hover highlight: the whole chain through a node, everything else dimmed.
   const focus = hover ?? selectedId;
-  const chain = useMemo(() => (focus ? chainOf(focus, graph.links) : null), [focus, graph.links]);
+  const chain = useMemo(
+    () => pinned ?? (focus ? chainOf(focus, graph.links) : null),
+    [pinned, focus, graph.links],
+  );
 
   const base = useMemo(
     () =>
       buildFlow(graph, {
         showExternal: settings.showExternal,
         showService,
+        filter,
         animateEdges: settings.animateEdges,
         vertical: settings.layoutDirection === 'DOWN',
         autoPositions: auto,
         highlight: null,
         highlightEdges: null,
       }),
-    [graph, settings, showService, auto],
+    [graph, settings, showService, filter, auto],
   );
 
   // Local node state so dragging is smooth; rebuilt whenever the server graph changes.
@@ -147,14 +155,20 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
   const displayNodes = useMemo(
     () =>
       chain
-        ? nodes.map((n) => ({ ...n, data: { ...n.data, dimmed: !chain.nodes.has(n.id) } }))
+        ? nodes.map((n) => {
+            const on = chain.nodes.has(n.id);
+            return { ...n, data: { ...n.data, dimmed: !on, highlighted: on } };
+          })
         : nodes,
     [nodes, chain],
   );
   const displayEdges: Edge<TopoEdgeData>[] = useMemo(
     () =>
       chain
-        ? base.edges.map((e) => ({ ...e, data: { ...e.data!, dimmed: !chain.edges.has(e.id) } }))
+        ? base.edges.map((e) => {
+            const on = chain.edges.has(e.id);
+            return { ...e, data: { ...e.data!, dimmed: !on, highlighted: on } };
+          })
         : base.edges,
     [base.edges, chain],
   );
@@ -226,6 +240,11 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
         setTimeout(() => rf.fitView({ duration: 300 }), 50);
       },
       fitView: () => rf.fitView({ duration: 300 }),
+      pinChain: (c) => {
+        setPinned(c);
+        if (c)
+          rf.fitView({ nodes: [...c.nodes].map((id) => ({ id })), duration: 400, padding: 0.3 });
+      },
       focusNode: (uuid) => {
         rf.fitView({ nodes: [{ id: uuid }], duration: 400, maxZoom: 1.2, padding: 1.5 });
         setSelectedId(uuid);
@@ -278,7 +297,10 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
         }}
         onNodeMouseEnter={(_, n) => setHover(n.id)}
         onNodeMouseLeave={() => setHover(null)}
-        onPaneClick={() => setSelectedId(null)}
+        onPaneClick={() => {
+          setSelectedId(null);
+          setPinned(null);
+        }}
         // Delete / Backspace asks first, performs the delete itself and keeps the canvas in sync
         // through the refetch (hence `false`).
         onBeforeDelete={async ({ nodes: ns, edges: es }) => {
@@ -290,6 +312,8 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
             await deleteNode.mutateAsync(n.id).catch((x) => notifyError(apiErrorMessage(x)));
           return false;
         }}
+        snapToGrid
+        snapGrid={[10, 10]}
         nodesDraggable={editable}
         nodesConnectable={editable}
         elementsSelectable
@@ -302,7 +326,7 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable ariaLabel={t('topology.minimap')} />
         <Panel position="top-left" className="!m-3">
-          <ProjectSummary graph={graph} onSeed={onSeed} seeding={seeding} editable={editable} />
+          <ProjectSummary graph={graph} onReview={onReview} editable={editable} />
         </Panel>
         <Panel position="bottom-left" className="!mb-24 !ml-3 md:!mb-3">
           <Legend preset={graph.map.preset} />

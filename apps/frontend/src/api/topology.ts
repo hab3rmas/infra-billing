@@ -12,6 +12,7 @@ import {
   type TopologyGraph,
   type TopologyLink,
   type TopologyMap,
+  type TopologyMapDocument,
   type TopologyNode,
   type TopologySettings,
   type UpdateTopologyLink,
@@ -83,6 +84,15 @@ export function useDuplicateMap() {
     mutationFn: async (uuid: string) =>
       (await api.post<TopologyMap>(FORK_API_PATH.TOPOLOGY.MAP_DUPLICATE(uuid))).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: MAPS_KEY }),
+  });
+}
+
+export function useImportMap() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (doc: TopologyMapDocument) =>
+      (await api.post<TopologyMap>(FORK_API_PATH.TOPOLOGY.MAP_IMPORT, doc)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['topology'] }),
   });
 }
 

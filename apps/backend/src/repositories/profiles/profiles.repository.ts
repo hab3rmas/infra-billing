@@ -33,6 +33,14 @@ export class ProfilesRepository {
     return this.prisma.profile.update({ where: { uuid }, data, include: WITH_PROJECTS });
   }
 
+  /** Hand the maps of a profile over to another one (before the profile is deleted). */
+  async moveMaps(from: string, to: string): Promise<void> {
+    await this.prisma.topologyMap.updateMany({
+      where: { profileUuid: from },
+      data: { profileUuid: to },
+    });
+  }
+
   async delete(uuid: string): Promise<void> {
     await this.prisma.profile.delete({ where: { uuid } });
   }

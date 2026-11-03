@@ -261,3 +261,39 @@ After every merge also run: the unit tests (`node --test apps/backend/fork-test/
 - To repeat after merging upstream: build both images from exports, start the upstream one on a fresh
   database, create a couple of services, stop it, start the fork on the same database and check the
   log says "Migrations applied." and the services are still there.
+
+## Review, routes and readability (stage 6)
+
+Added after the first real use; nothing in upstream files changed for it.
+
+- **Chain highlight.** Hovering a node (or picking it in the search) dims everything outside its chain
+  to ~18 %, draws the chain's links thicker with a glow and faster dots, and rings its nodes.
+  A route can also be pinned from the routes dialog (click the empty canvas to release).
+- **Review the map** (map menu, or the "Review" button of the project card): imported nodes without a
+  billing server with one-click suggestions (exact IP, else same country within the map's project) and
+  a picker; billing servers of the project that no node represents (adding a new card is the last
+  resort, because it duplicates an imported node of the same server); the warnings of the last sync
+  (also on the integration card); map problems (nodes without links, cycles); hidden nodes and links
+  with a "Show" button. Pure logic: `pages/topology/logic.ts`, tests `fork-test/topology-logic.test.mjs`.
+- **Routes and cost** (map menu): per `vlessRoute` number, the path, the billing servers on it and
+  their monthly cost in the base currency (rates from the panel; a missing rate is reported, not
+  guessed). The cost is only in this dialog and in the node sheet's "On routes" line, never on cards.
+- **Readability.** Service links (panel, subscription…) are hidden by default on maps with more than 14
+  nodes (the toggle remembers the choice per map). A "Filter" button over the canvas narrows the map by
+  country and to online servers. Snap to a 10 px grid. Header actions are icon-only so the map switcher
+  always fits.
+- **Country flags** also for nodes without a billing server (Remnawave country, or a hand-set one in the
+  node sheet, stored as `meta.countryManual` so a sync never overwrites it).
+- **Maps as files.** Export > "Map (JSON)" and map menu > "Import a map (JSON)"
+  (`POST /topology/maps/import`; a service link is kept only if that service still exists).
+- **Phone.** A node list (flag, role, address, status) is shown first; the canvas is one tap away.
+- **Profiles.** Deleting a profile that owns maps asks whether to hand them to another profile
+  (`DELETE /profiles/:uuid?moveMapsTo=`), instead of leaving them visible only in "All".
+- **Account default project** reconciler now polls every minute (was 5): it cannot hook the upstream
+  sync without editing it.
+- Fixed on the way: concurrent first requests for the settings row, profile membership written inside
+  the creating transaction, the update/delete guard of the profile scope, flag/IP matching when DNS
+  returns fake IPs (198.18.0.0/15).
+- Not done: undo (Ctrl+Z), reconnecting a link end by dragging, Telegram alerts for topology events
+  (not wanted), per-token profile binding.
+- Tests: `fork-test/stage6-api.mjs`, `scripts/fork-e2e-review.mjs`, updated `fork-e2e-mobile.mjs`.

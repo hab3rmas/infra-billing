@@ -320,6 +320,11 @@ async function resolveIps(address: string): Promise<string[]> {
   }
 }
 
+function warningsOf(snapshot: unknown): string[] {
+  const w = asJson(snapshot).warnings;
+  return Array.isArray(w) ? w.filter((x): x is string => typeof x === 'string') : [];
+}
+
 function map(r: Row): IntegrationDto {
   return {
     uuid: r.uuid,
@@ -335,6 +340,7 @@ function map(r: Row): IntegrationDto {
     autoSync: r.autoSync,
     lastSyncAt: dateToIso(r.lastSyncAt),
     lastSyncError: r.lastSyncError,
+    lastWarnings: warningsOf(r.lastSnapshot),
     createdAt: dateToIso(r.createdAt)!,
     updatedAt: dateToIso(r.updatedAt)!,
   };

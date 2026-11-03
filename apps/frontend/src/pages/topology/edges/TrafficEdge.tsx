@@ -68,7 +68,7 @@ export function TrafficEdge({
   const showLabel = link.label || link.route != null;
 
   return (
-    <g className={cn('transition-opacity', data.dimmed && 'opacity-30')}>
+    <g className={cn('transition-opacity', data.dimmed && 'opacity-[0.1]')}>
       <defs>
         <marker
           id={markerId}
@@ -88,17 +88,22 @@ export function TrafficEdge({
         markerEnd={`url(#${markerId})`}
         style={{
           stroke: color,
-          strokeWidth: selected ? style.width + 1 : style.width,
+          strokeWidth: selected
+            ? style.width + 1
+            : data.highlighted
+              ? style.width + 1.5
+              : style.width,
           strokeDasharray: style.dash,
+          filter: data.highlighted ? `drop-shadow(0 0 3px ${color})` : undefined,
         }}
         interactionWidth={16}
       />
-      {data.animate &&
+      {(data.animate || (data.highlighted && style.traffic)) &&
         !reduced &&
         DOT_PHASES.map((i) => (
-          <circle key={`dot-${i}`} r="3" fill={color} aria-hidden>
+          <circle key={`dot-${i}`} r={data.highlighted ? 4 : 3} fill={color} aria-hidden>
             <animateMotion
-              dur={`${DOT_SECONDS}s`}
+              dur={`${data.highlighted ? DOT_SECONDS / 2 : DOT_SECONDS}s`}
               repeatCount="indefinite"
               path={path}
               begin={`${-(DOT_SECONDS / DOT_COUNT) * i}s`}

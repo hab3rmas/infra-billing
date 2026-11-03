@@ -14,7 +14,8 @@ export function GroupNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
       className={cn(
         'h-full w-full rounded-2xl border border-dashed bg-card/40 transition-opacity',
         selected ? 'border-ring' : 'border-ink-3',
-        data.dimmed && 'opacity-30',
+        data.highlighted && 'border-slate',
+        data.dimmed && 'opacity-[0.18]',
       )}
     >
       <div className="flex items-center gap-1.5 px-4 pt-2.5 text-xs text-ink-2">

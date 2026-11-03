@@ -59,7 +59,10 @@ console.log('drag saved:', moved.length, 'node');
 
 await node.hover();
 await page.waitForTimeout(300);
-assert.ok((await page.locator('.react-flow__node .opacity-30').count()) > 0, 'hover dims others');
+assert.ok(
+  (await page.locator('.react-flow__node .opacity-\\[0\\.18\\]').count()) > 0,
+  'hover dims others',
+);
 console.log('hover dims other nodes');
 
 const count = await page.locator('.react-flow__node').count();

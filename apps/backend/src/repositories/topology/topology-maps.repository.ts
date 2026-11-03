@@ -51,6 +51,69 @@ export class TopologyMapsRepository {
     return this.prisma.topologyMap.delete({ where: { uuid } });
   }
 
+  /**
+   * Create a map from an imported document. Nodes get new uuids (`ids` maps document id to uuid),
+   * a service link is kept only when that service still exists.
+   */
+  importDocument(
+    map: Prisma.TopologyMapUncheckedCreateInput,
+    nodes: (Omit<Prisma.TopologyNodeUncheckedCreateInput, 'mapUuid'> & {
+      docId: string;
+      parentDocId: string | null;
+    })[],
+    links: (Omit<Prisma.TopologyLinkUncheckedCreateInput, 'mapUuid' | 'fromUuid' | 'toUuid'> & {
+      fromDoc: string;
+      toDoc: string;
+    })[],
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.topologyMap.create({ data: map });
+      const services = new Set(
+        (
+          await tx.service.findMany({
+            where: { uuid: { in: nodes.flatMap((n) => (n.serviceUuid ? [n.serviceUuid] : [])) } },
+            select: { uuid: true },
+          })
+        ).map((s) => s.uuid),
+      );
+      const ids = new Map<string, string>();
+      for (const { docId, parentDocId: _p, ...n } of nodes) {
+        const row = await tx.topologyNode.create({
+          data: {
+            ...n,
+            mapUuid: created.uuid,
+            source: 'manual',
+            serviceUuid: n.serviceUuid && services.has(n.serviceUuid) ? n.serviceUuid : null,
+          },
+          select: { uuid: true },
+        });
+        ids.set(docId, row.uuid);
+      }
+      for (const n of nodes) {
+        if (!n.parentDocId) continue;
+        const parent = ids.get(n.parentDocId);
+        if (parent) {
+          await tx.topologyNode.update({
+            where: { uuid: ids.get(n.docId) as string },
+            data: { parentUuid: parent },
+          });
+        }
+      }
+      for (const { fromDoc, toDoc, ...l } of links) {
+        const fromUuid = ids.get(fromDoc);
+        const toUuid = ids.get(toDoc);
+        if (!fromUuid || !toUuid || fromUuid === toUuid) continue;
+        await tx.topologyLink.create({
+          data: { ...l, mapUuid: created.uuid, fromUuid, toUuid, source: 'manual' },
+        });
+      }
+      return tx.topologyMap.findUniqueOrThrow({
+        where: { uuid: created.uuid },
+        include: LIST_INCLUDE,
+      });
+    });
+  }
+
   /** Copy a map with its nodes, links and positions. Importer bindings are not copied. */
   duplicate(uuid: string, name: string) {
     return this.prisma.$transaction(async (tx) => {

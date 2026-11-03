@@ -8,6 +8,7 @@ import {
   seedResultSchema,
   serviceSshTargetSchema,
   topologyGraphSchema,
+  topologyMapDocumentSchema,
   topologyLinkSchema,
   topologyMapSchema,
   topologyNodeSchema,
@@ -35,4 +36,5 @@ export class TopologyGraphDto extends createZodDto(topologyGraphSchema) {}
 export class SeedFromServicesDto extends createZodDto(seedFromServicesSchema) {}
 export class ServiceSshTargetDto extends createZodDto(serviceSshTargetSchema) {}
 export class AdoptTabbyProfilesResultDto extends createZodDto(adoptTabbyProfilesResultSchema) {}
+export class TopologyMapDocumentDto extends createZodDto(topologyMapDocumentSchema) {}
 export class SeedResultDto extends createZodDto(seedResultSchema) {}

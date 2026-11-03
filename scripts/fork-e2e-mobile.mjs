@@ -47,6 +47,11 @@ await page.keyboard.press('Enter');
 await page.waitForURL(`${base}/`);
 
 await page.goto(`${base}/topology?map=${map}`);
+// A phone gets the node list first: a canvas of many cards is unreadable at 390 px.
+await page.getByRole('tab', { name: /Список|List/ }).waitFor();
+assert.ok((await page.locator('ul li button').count()) >= 3, 'the node list is shown');
+await page.screenshot({ path: path.join(out, 'topology-mobile-list.png') });
+await page.getByRole('tab', { name: /Схема|Map/ }).click();
 await page.waitForSelector('.react-flow__node-server');
 await page.waitForTimeout(1500);
 assert.equal(

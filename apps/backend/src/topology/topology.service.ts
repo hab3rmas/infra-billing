@@ -10,6 +10,7 @@ import type {
   TopologyGraph,
   TopologyLink as TopologyLinkDto,
   TopologyMap as TopologyMapDto,
+  TopologyMapDocument,
   TopologyNode as TopologyNodeDto,
   TopologySettings as TopologySettingsDto,
 } from '@infra/shared';
@@ -80,6 +81,55 @@ export class TopologyService {
     if (dto.projectUuid !== undefined) data.projectUuid = dto.projectUuid;
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
     return mapTopologyMap(await this.maps.update(uuid, data));
+  }
+
+  /** Rebuild a map from a document written by the Export menu. */
+  async importMap(doc: TopologyMapDocument): Promise<TopologyMapDto> {
+    const ids = new Set(doc.nodes.map((n) => n.id));
+    if (ids.size !== doc.nodes.length) throw new BadRequestException('Node ids must be unique');
+    for (const l of doc.links) {
+      if (!ids.has(l.from) || !ids.has(l.to)) {
+        throw new BadRequestException('A link points at a node that is not in the document');
+      }
+    }
+    const last = (await this.maps.list()).at(-1);
+    const map = await this.maps.importDocument(
+      {
+        name: doc.name,
+        preset: doc.preset,
+        profileUuid: currentProfileScope()?.profileUuid ?? null,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+      },
+      doc.nodes.map((n) => ({
+        docId: n.id,
+        parentDocId: n.parentId,
+        // An imported Remnawave node is a plain node here: nothing would sync it.
+        kind: n.kind === 'remnawave' ? 'external' : n.kind,
+        role: n.role,
+        label: n.label,
+        serviceUuid: n.serviceUuid,
+        addresses: n.addresses as Prisma.InputJsonValue,
+        posX: n.posX,
+        posY: n.posY,
+        hidden: n.hidden,
+        sshHost: n.sshHost,
+        sshPort: n.sshPort,
+        sshUser: n.sshUser,
+        tabbyProfile: n.tabbyProfile,
+        meta: (n.countryCode ? { countryManual: n.countryCode } : {}) as Prisma.InputJsonValue,
+      })),
+      doc.links.map((l) => ({
+        fromDoc: l.from,
+        toDoc: l.to,
+        kind: l.kind,
+        label: l.label,
+        route: l.route,
+        protocol: l.protocol,
+        animated: l.animated,
+        hidden: l.hidden,
+      })),
+    );
+    return mapTopologyMap(map);
   }
 
   async removeMap(uuid: string): Promise<void> {
@@ -192,6 +242,14 @@ export class TopologyService {
     if (node.source === 'remnawave' && Object.keys(owned).length > 0) {
       data.meta = { ...asObject(node.meta), ...owned } as Prisma.InputJsonValue;
     }
+    if (dto.countryCode !== undefined) {
+      // Kept apart from the importer's own `countryCode`, which a sync may rewrite.
+      const base = (data.meta as Record<string, unknown> | undefined) ?? asObject(node.meta);
+      const { countryManual: _drop, ...rest } = base;
+      data.meta = (
+        dto.countryCode ? { ...rest, countryManual: dto.countryCode } : rest
+      ) as Prisma.InputJsonValue;
+    }
     if (dto.label !== undefined) data.label = dto.label;
     if (dto.serviceUuid !== undefined) data.serviceUuid = dto.serviceUuid;
     if (dto.parentUuid !== undefined) data.parentUuid = dto.parentUuid;
@@ -273,7 +331,9 @@ export class TopologyService {
         (f) => f in data && (data as Record<string, unknown>)[f] !== current[f],
       );
       if (changed.length > 0) {
-        const overridden = new Set<string>(asStringArray(asObject(link.meta).overridden).concat(changed));
+        const overridden = new Set<string>(
+          asStringArray(asObject(link.meta).overridden).concat(changed),
+        );
         data.meta = {
           ...asObject(link.meta),
           overridden: [...overridden],

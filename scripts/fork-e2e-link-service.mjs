@@ -6,7 +6,6 @@
  *   CAPTURE_URL=http://127.0.0.1:8091 CAPTURE_USER=owner CAPTURE_PASSWORD=… \
  *     node scripts/fork-e2e-link-service.mjs <map uuid>
  *
- * The map needs a server card without a billing service (the demo seed has "Telegram-бот").
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -38,11 +37,24 @@ await page.waitForURL(`${base}/`);
 const graph = () =>
   page.evaluate(async (m) => (await fetch(`/api/topology/maps/${m}`)).json(), map);
 
+// Its own fixture: a bot card without a billing service, and a free server to link it to.
+const stamp = Date.now().toString(36);
+await page.evaluate(
+  async ([m, label]) => {
+    await fetch('/api/topology/nodes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mapUuid: m, kind: 'external', role: 'bot', label }),
+    });
+  },
+  [map, `Bot ${stamp}`],
+);
+
 await page.goto(`${base}/topology?map=${map}`);
 await page.waitForSelector('.react-flow__node-server');
 await page.waitForTimeout(1200);
 const target = (await graph()).nodes.find(
-  (n) => !n.serviceUuid && n.kind === 'external' && n.role === 'bot',
+  (n) => !n.serviceUuid && n.kind === 'external' && n.label === `Bot ${stamp}`,
 );
 assert.ok(target, 'a server node without a service exists');
 

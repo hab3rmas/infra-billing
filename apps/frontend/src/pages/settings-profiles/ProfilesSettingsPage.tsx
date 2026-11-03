@@ -8,6 +8,7 @@ import { apiErrorMessage } from '@/api/client';
 import {
   useCreateProfile,
   useDeleteProfile,
+  useAllMaps,
   useAllProjects,
   useProfiles,
   useSetProfileProjects,
@@ -59,6 +60,7 @@ export function ProfilesSettingsPage() {
   const setProjects = useSetProfileProjects();
   const del = useDeleteProfile();
   const test = useTestProfileNotification();
+  const { data: maps } = useAllMaps();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const form = useForm<FormValues>({ defaultValues: EMPTY });
@@ -132,7 +134,15 @@ export function ProfilesSettingsPage() {
   const doDelete = async (p: Profile) => {
     if (!window.confirm(t('profiles.confirmDelete', { name: p.name }))) return;
     try {
-      await del.mutateAsync(p.uuid);
+      // Its maps would otherwise be visible only in "All": offer to hand them to another profile.
+      const others = (profiles ?? []).filter((x) => x.uuid !== p.uuid);
+      const moveMapsTo =
+        others.length > 0 && maps?.some((m) => m.profileUuid === p.uuid)
+          ? window.confirm(t('profiles.moveMapsConfirm', { name: others[0].name }))
+            ? others[0].uuid
+            : undefined
+          : undefined;
+      await del.mutateAsync({ uuid: p.uuid, moveMapsTo });
       notifySuccess(t('common.deleted'));
     } catch (e) {
       notifyError(apiErrorMessage(e));

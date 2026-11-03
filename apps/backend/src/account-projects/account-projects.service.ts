@@ -11,7 +11,9 @@ import { ProviderAccountsRepository } from '@repositories/provider-accounts/prov
 import { pickServicesToMove } from '../topology/topology.utils';
 
 const RECONCILE_INTERVAL_NAME = 'fork-account-projects';
-const RECONCILE_INTERVAL_MS = 5 * 60_000;
+// Upstream's sync cannot be hooked without editing it, so poll often: the query is a no-op until an
+// account has a default project.
+const RECONCILE_INTERVAL_MS = 60_000;
 
 // Upstream's SyncService drops every new service into the default project (it can't know the
 // project). This reconciler runs on its own timer and moves them to their account's project, once

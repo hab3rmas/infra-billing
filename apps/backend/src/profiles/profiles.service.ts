@@ -85,8 +85,13 @@ export class ProfilesService {
   }
 
   /** Projects and services are never deleted: they just fall out of every profile. */
-  async remove(uuid: string): Promise<void> {
+  async remove(uuid: string, moveMapsTo?: string): Promise<void> {
     await this.ensureExists(uuid);
+    if (moveMapsTo) {
+      if (moveMapsTo === uuid) throw new BadRequestException('Pick another profile');
+      await this.ensureExists(moveMapsTo);
+      await this.repo.moveMaps(uuid, moveMapsTo);
+    }
     await this.repo.delete(uuid);
   }
 

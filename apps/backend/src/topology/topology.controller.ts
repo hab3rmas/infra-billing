@@ -32,6 +32,7 @@ import {
   SeedResultDto,
   TopologyGraphDto,
   TopologyLinkDto,
+  TopologyMapDocumentDto,
   TopologyMapDto,
   TopologyNodeDto,
   TopologySettingsDto,
@@ -66,6 +67,15 @@ export class TopologyController {
   @ApiCreatedResponse({ type: TopologyMapDto })
   createMap(@Body() dto: CreateTopologyMapDto) {
     return this.topology.createMap(dto);
+  }
+
+  // Declared before maps/:uuid so "import" is never read as a map id.
+  @Post(FORK_API_SUB.TOPOLOGY_MAP_IMPORT)
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Create a map from an exported JSON document' })
+  @ApiCreatedResponse({ type: TopologyMapDto })
+  importMap(@Body() dto: TopologyMapDocumentDto) {
+    return this.topology.importMap(dto);
   }
 
   @Get(FORK_API_SUB.TOPOLOGY_MAP_BY_ID)

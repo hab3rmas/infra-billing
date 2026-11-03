@@ -24,7 +24,10 @@ import {
 import { formatMoney } from '@/utils/format';
 import { notifyError, notifySuccess } from '@/utils/notify';
 import { EDGE_STYLES } from '../edgeStyles';
+import { CountryCombobox } from '@/components/CountryCombobox';
+import { useCountryOptions } from '@/utils/countries';
 import { nodeCountry } from '../graph';
+import { routeChain, routeNumbers } from '../logic';
 import { ROLES } from '../roles';
 
 interface Props {
@@ -45,11 +48,13 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
   const mapUuid = graph.map.uuid;
   const update = useUpdateNode(mapUuid);
   const { data: services } = useServices({});
+  const countryOptions = useCountryOptions();
   const del = useDeleteNode(mapUuid);
   const [label, setLabel] = useState('');
   const [role, setRole] = useState<TopologyNodeRole>('other');
   const [parentUuid, setParentUuid] = useState('');
   const [serviceUuid, setServiceUuid] = useState('');
+  const [countryCode, setCountryCode] = useState('');
   const [addresses, setAddresses] = useState<Addr[]>([]);
   const [sshHost, setSshHost] = useState('');
   const [sshPort, setSshPort] = useState('');
@@ -62,6 +67,7 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
     setRole(node.role);
     setParentUuid(node.parentUuid ?? '');
     setServiceUuid(node.serviceUuid ?? '');
+    setCountryCode(typeof node.meta.countryManual === 'string' ? node.meta.countryManual : '');
     setAddresses(node.addresses);
     setSshHost(node.sshHost ?? '');
     setSshPort(node.sshPort?.toString() ?? '');
@@ -89,6 +95,10 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
     }))
     .sort((a, b) => a.rank - b.rank)
     .map(({ rank: _rank, ...o }) => o);
+
+  const routesOfNode = node
+    ? routeNumbers(graph.links).filter((r) => routeChain(r, graph.links).nodes.has(node.uuid))
+    : [];
 
   if (!node) return <Sheet open={false} />;
   const svc = node.service;
@@ -126,6 +136,8 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
           role,
           parentUuid: parentUuid || null,
           serviceUuid: serviceUuid || null,
+          // A flag for a node that has no billing service to take the country from.
+          ...(serviceUuid ? {} : { countryCode: countryCode || null }),
           addresses: addresses.filter((a) => a.value.trim()),
           sshHost: sshHost.trim() || null,
           sshPort: port,
@@ -211,6 +223,17 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
             />
             <p className="text-xs text-ink-2">{t('topology.serviceLinkHint')}</p>
           </div>
+          {!serviceUuid && (
+            <div className="space-y-2">
+              <Label>{t('topology.country')}</Label>
+              <CountryCombobox
+                value={countryCode}
+                onChange={setCountryCode}
+                options={countryOptions}
+                placeholder={t('topology.countryAuto')}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label>{t('topology.role.title')}</Label>
             <Combobox
@@ -338,6 +361,13 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
               </div>
             )}
           </div>
+
+          {routesOfNode.length > 0 && (
+            <p className="text-xs text-ink-2">
+              {t('topology.inRoutes')}:{' '}
+              {routesOfNode.map((r) => t('topology.routeN', { n: r })).join(', ')}
+            </p>
+          )}
 
           <div className="space-y-2">
             <Label>{t('topology.links')}</Label>

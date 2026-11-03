@@ -17,7 +17,8 @@ export function ExternalNode({ data, selected }: NodeProps<Node<TopoNodeData>>) 
       className={cn(
         'flex h-10 items-center gap-2 rounded-full border bg-secondary px-4 text-sm text-ink-2 transition-opacity',
         selected ? 'border-ring' : 'border-transparent',
-        data.dimmed && 'opacity-30',
+        data.highlighted && 'border-slate bg-card ring-2 ring-slate/30',
+        data.dimmed && 'opacity-[0.18]',
       )}
     >
       <Handle type="target" position={target} className="topology-handle" />

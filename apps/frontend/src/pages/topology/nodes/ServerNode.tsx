@@ -50,7 +50,8 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
       className={cn(
         'w-[232px] rounded-xl border bg-card px-3 py-2.5 text-card-foreground shadow-xs transition-opacity',
         selected ? 'border-ring' : 'border-border',
-        data.dimmed && 'opacity-30',
+        data.highlighted && 'border-slate shadow-md ring-2 ring-slate/30',
+        data.dimmed && 'opacity-[0.18]',
       )}
     >
       <Handle type="target" position={target} className="topology-handle" />

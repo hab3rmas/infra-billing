@@ -291,6 +291,18 @@ export function RemnawaveSection({ preselectMap }: { preselectMap: string | null
                 ? t('remnawave.lastSync', { when: dayjs(i.lastSyncAt).format('DD.MM.YYYY HH:mm') })
                 : t('remnawave.neverSynced')}
             </p>
+            {i.lastWarnings.length > 0 && (
+              <details className="text-xs text-ink-2">
+                <summary className="cursor-pointer">
+                  {t('remnawave.warnings', { count: i.lastWarnings.length })}
+                </summary>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {i.lastWarnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {i.lastSyncError && (
               <p className="flex items-start gap-1.5 text-xs text-destructive">
                 <IconAlertTriangle className="mt-0.5 size-3.5 shrink-0" />

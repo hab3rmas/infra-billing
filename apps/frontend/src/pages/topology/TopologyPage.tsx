@@ -1,7 +1,10 @@
-import type { TopologyMap } from '@infra/shared';
+import type { TopologyMap, TopologyMapDocument } from '@infra/shared';
 import {
   IconCopy,
+  IconChecklist,
   IconDownload,
+  IconRoute,
+  IconUpload,
   IconDots,
   IconLayoutDistributeHorizontal,
   IconPencil,
@@ -18,6 +21,7 @@ import { useProjects } from '@/api/projects';
 import {
   useDeleteMap,
   useDuplicateMap,
+  useImportMap,
   useSeedMap,
   useTopologyGraph,
   useTopologyMaps,
@@ -45,9 +49,14 @@ import { AddNodeDialog } from './panels/AddNodeDialog';
 import { LinkDialog, type LinkDialogState } from './panels/LinkDialog';
 import { MapDialog } from './panels/MapDialog';
 import { NodeSheet } from './panels/NodeSheet';
+import { FilterPopover, NO_FILTER } from './panels/FilterPopover';
+import { NodeList } from './panels/NodeList';
+import { ReviewDialog } from './panels/ReviewDialog';
+import { RoutesDialog } from './panels/RoutesDialog';
 import { TabbyExportDialog } from './panels/TabbyExportDialog';
 
 const SEGMENTED_MAX = 4;
+const BIG_MAP_NODES = 14;
 const parseLast = (raw: unknown): { map?: string } | null =>
   raw && typeof raw === 'object' && typeof (raw as { map?: unknown }).map === 'string'
     ? { map: (raw as { map: string }).map }
@@ -70,6 +79,7 @@ export function TopologyPage() {
     setParams({ map: uuid }, { replace: true });
     setLast({ map: uuid });
     setSelectedNode(null);
+    setFilter(NO_FILTER);
   };
   // Keep the address bar in step with the map actually shown.
   useEffect(() => {
@@ -86,7 +96,21 @@ export function TopologyPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [showService, setShowService] = useState(true);
+  // Service links (panel, subscription…) are hidden by default on a big map: they are what makes
+  // an imported 20-node map unreadable. The owner's choice is kept per map.
+  const [serviceChoice, setServiceChoice] = useState<{ map: string; value: boolean } | null>(null);
+  const showService =
+    serviceChoice && serviceChoice.map === current?.uuid
+      ? serviceChoice.value
+      : (graph?.nodes.filter((n) => !n.hidden).length ?? 0) <= BIG_MAP_NODES;
+  const setShowService = (fn: (v: boolean) => boolean) =>
+    current && setServiceChoice({ map: current.uuid, value: fn(showService) });
+  const [filter, setFilter] = useState(NO_FILTER);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [routesOpen, setRoutesOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
+  const importInput = useRef<HTMLInputElement>(null);
+  const importMap = useImportMap();
   const [tabbyOpen, setTabbyOpen] = useState(false);
   const { data: integrations } = useRemnawaveIntegrations();
   const rwSync = useSyncRemnawave();
@@ -158,6 +182,61 @@ export function TopologyPage() {
     );
   };
 
+  const exportJson = () => {
+    if (!graph) return;
+    const doc: TopologyMapDocument = {
+      version: 1,
+      name: graph.map.name,
+      preset: graph.map.preset,
+      nodes: graph.nodes.map((n) => ({
+        id: n.uuid,
+        kind: n.kind,
+        role: n.role,
+        label: n.label,
+        serviceUuid: n.serviceUuid,
+        parentId: n.parentUuid,
+        addresses: n.addresses,
+        posX: n.posX,
+        posY: n.posY,
+        hidden: n.hidden,
+        sshHost: n.sshHost,
+        sshPort: n.sshPort,
+        sshUser: n.sshUser,
+        tabbyProfile: n.tabbyProfile,
+        countryCode: typeof n.meta.countryManual === 'string' ? n.meta.countryManual : null,
+      })),
+      links: graph.links.map((l) => ({
+        from: l.fromUuid,
+        to: l.toUuid,
+        kind: l.kind,
+        label: l.label,
+        route: l.route,
+        protocol: l.protocol,
+        animated: l.animated,
+        hidden: l.hidden,
+      })),
+    };
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `topology-${graph.map.name.replace(/\s+/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJson = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const doc = JSON.parse(await file.text());
+      select((await importMap.mutateAsync(doc)).uuid);
+      notifySuccess(t('topology.imported'));
+    } catch (e) {
+      notifyError(e instanceof SyntaxError ? t('topology.importInvalid') : apiErrorMessage(e));
+    }
+  };
+
   const switcher =
     maps && maps.length > 0 ? (
       <div className="flex items-center gap-2">
@@ -200,11 +279,23 @@ export function TopologyPage() {
                 <IconPlus className="size-4" />
                 {t('topology.newMap')}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => importInput.current?.click()}>
+                <IconUpload className="size-4" />
+                {t('topology.importMap')}
+              </DropdownMenuItem>
               {current && (
                 <>
                   <DropdownMenuItem onSelect={() => setMapDialog({ editing: current })}>
                     <IconPencil className="size-4" />
                     {t('topology.editMap')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setReviewOpen(true)}>
+                    <IconChecklist className="size-4" />
+                    {t('topology.reviewMenu')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setRoutesOpen(true)}>
+                    <IconRoute className="size-4" />
+                    {t('topology.routesMenu')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => doDuplicate(current)}>
                     <IconCopy className="size-4" />
@@ -225,21 +316,36 @@ export function TopologyPage() {
 
   const actions = current && !isMobile && (
     <>
-      <Button size="sm" variant="ghost" onClick={() => canvas.current?.autoLayout()}>
+      <Button
+        size="icon"
+        variant="ghost"
+        aria-label={t('topology.autoLayout')}
+        title={t('topology.autoLayout')}
+        onClick={() => canvas.current?.autoLayout()}
+      >
         <IconLayoutDistributeHorizontal className="size-4" />
-        {t('topology.autoLayout')}
       </Button>
       {mapIntegrations.length > 0 && (
-        <Button size="sm" variant="ghost" onClick={doRwSync} disabled={rwSync.isPending}>
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label={t('remnawave.syncShort')}
+          title={t('remnawave.syncShort')}
+          onClick={doRwSync}
+          disabled={rwSync.isPending}
+        >
           <IconRefresh className={cn('size-4', rwSync.isPending && 'animate-spin')} />
-          {t('remnawave.syncShort')}
         </Button>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t('topology.export')}
+            title={t('topology.export')}
+          >
             <IconDownload className="size-4" />
-            {t('topology.export')}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -249,6 +355,7 @@ export function TopologyPage() {
           <DropdownMenuItem onSelect={() => canvas.current?.exportImage('svg')}>
             SVG
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exportJson}>{t('topology.exportJson')}</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setTabbyOpen(true)}>
             {t('tabby.exportMenu')}
@@ -317,81 +424,105 @@ export function TopologyPage() {
           </AlertDescription>
         </Alert>
       )}
-      <div className="relative h-[calc(100dvh-8rem)] min-h-96 overflow-hidden rounded-xl border border-border">
-        {graphLoading || !graph ? (
-          <Skeleton className="size-full" />
-        ) : (
-          <>
-            <div className="absolute top-3 right-3 z-10 hidden items-center gap-2 md:flex">
-              {graph && graph.nodes.length > 0 && (
-                <div className="w-48">
-                  <Combobox
-                    value={search}
-                    onChange={(uuid) => {
-                      setSearch('');
-                      if (uuid) canvas.current?.focusNode(uuid);
-                    }}
-                    placeholder={t('topology.searchNode')}
-                    options={graph.nodes
-                      .filter((n) => !n.hidden)
-                      .map((n) => ({
-                        value: n.uuid,
-                        label: n.label || n.service?.name || t('topology.unnamed'),
-                        keywords: [
-                          ...n.addresses.map((a) => a.value),
-                          n.service?.name ?? '',
-                          n.sshHost ?? '',
-                        ],
-                      }))}
-                  />
+      {isMobile && graph && (
+        <div role="tablist" className="mb-3 flex gap-1 rounded-lg bg-secondary p-0.5 text-sm">
+          {(['list', 'map'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={mobileView === v}
+              onClick={() => setMobileView(v)}
+              className={cn(
+                'flex-1 rounded-md px-3 py-1 text-ink-2',
+                mobileView === v && 'bg-card font-medium text-foreground shadow-xs',
+              )}
+            >
+              {t(v === 'list' ? 'topology.viewList' : 'topology.viewMap')}
+            </button>
+          ))}
+        </div>
+      )}
+      {isMobile && graph && mobileView === 'list' ? (
+        <NodeList graph={graph} onOpen={setSelectedNode} />
+      ) : (
+        <div className="relative h-[calc(100dvh-8rem)] min-h-96 overflow-hidden rounded-xl border border-border">
+          {graphLoading || !graph ? (
+            <Skeleton className="size-full" />
+          ) : (
+            <>
+              <div className="absolute top-3 right-3 z-10 hidden items-center gap-2 md:flex">
+                {graph && graph.nodes.length > 0 && (
+                  <div className="w-48">
+                    <Combobox
+                      value={search}
+                      onChange={(uuid) => {
+                        setSearch('');
+                        if (uuid) canvas.current?.focusNode(uuid);
+                      }}
+                      placeholder={t('topology.searchNode')}
+                      options={graph.nodes
+                        .filter((n) => !n.hidden)
+                        .map((n) => ({
+                          value: n.uuid,
+                          label: n.label || n.service?.name || t('topology.unnamed'),
+                          keywords: [
+                            ...n.addresses.map((a) => a.value),
+                            n.service?.name ?? '',
+                            n.sshHost ?? '',
+                          ],
+                        }))}
+                    />
+                  </div>
+                )}
+                {graph && <FilterPopover graph={graph} value={filter} onChange={setFilter} />}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-card"
+                  onClick={() => setShowService((v) => !v)}
+                >
+                  {showService ? t('topology.hideService') : t('topology.showService')}
+                </Button>
+              </div>
+              <TopologyCanvas
+                graph={graph}
+                showService={showService}
+                filter={filter}
+                controlRef={canvas}
+                onOpenNode={setSelectedNode}
+                onLink={setLinkDialog}
+                onReview={() => setReviewOpen(true)}
+              />
+              {visibleNodes.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="pointer-events-auto max-w-sm space-y-3 rounded-xl border border-border bg-card p-5 text-center shadow-xs">
+                    <p className="text-sm font-medium">{t('topology.mapEmptyTitle')}</p>
+                    <p className="text-xs text-ink-2">{t('topology.mapEmptyHint')}</p>
+                    {!isMobile && (
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {current?.projectUuid && (
+                          <Button size="sm" onClick={doSeed} disabled={seed.isPending}>
+                            {t('topology.seedServers')}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => setAddOpen(true)}>
+                          {t('topology.addNode')}
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link to={`/settings/topology?map=${current?.uuid}`}>
+                            {t('remnawave.connectToMap')}
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-card"
-                onClick={() => setShowService((v) => !v)}
-              >
-                {showService ? t('topology.hideService') : t('topology.showService')}
-              </Button>
-            </div>
-            <TopologyCanvas
-              graph={graph}
-              showService={showService}
-              controlRef={canvas}
-              onOpenNode={setSelectedNode}
-              onLink={setLinkDialog}
-              onSeed={doSeed}
-              seeding={seed.isPending}
-            />
-            {visibleNodes.length === 0 && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="pointer-events-auto max-w-sm space-y-3 rounded-xl border border-border bg-card p-5 text-center shadow-xs">
-                  <p className="text-sm font-medium">{t('topology.mapEmptyTitle')}</p>
-                  <p className="text-xs text-ink-2">{t('topology.mapEmptyHint')}</p>
-                  {!isMobile && (
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {current?.projectUuid && (
-                        <Button size="sm" onClick={doSeed} disabled={seed.isPending}>
-                          {t('topology.seedServers')}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => setAddOpen(true)}>
-                        {t('topology.addNode')}
-                      </Button>
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link to={`/settings/topology?map=${current?.uuid}`}>
-                          {t('remnawave.connectToMap')}
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      )}
 
       {graph && (
         <>
@@ -404,9 +535,35 @@ export function TopologyPage() {
           />
           <AddNodeDialog open={addOpen} onOpenChange={setAddOpen} map={graph.map} />
           <TabbyExportDialog open={tabbyOpen} onOpenChange={setTabbyOpen} />
+          <ReviewDialog
+            open={reviewOpen}
+            onOpenChange={setReviewOpen}
+            graph={graph}
+            integrations={mapIntegrations}
+            onOpenNode={(uuid) => {
+              setReviewOpen(false);
+              setSelectedNode(uuid);
+            }}
+          />
+          <RoutesDialog
+            open={routesOpen}
+            onOpenChange={setRoutesOpen}
+            graph={graph}
+            onPin={(chain) => canvas.current?.pinChain(chain)}
+          />
           <LinkDialog state={linkDialog} onClose={() => setLinkDialog(null)} map={graph.map} />
         </>
       )}
+      <input
+        ref={importInput}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          void importJson(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
       <MapDialog
         open={mapDialog !== null}
         onOpenChange={(o) => !o && setMapDialog(null)}

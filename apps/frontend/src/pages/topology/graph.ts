@@ -16,6 +16,8 @@ export interface TopoNodeData extends Record<string, unknown> {
   /** Children of a group, for sizing. */
   childCount: number;
   dimmed: boolean;
+  /** On the hovered / picked chain (drawn emphasised). */
+  highlighted: boolean;
   /** Vertical flow: handles on top and bottom instead of left and right. */
   vertical: boolean;
 }
@@ -23,6 +25,7 @@ export interface TopoNodeData extends Record<string, unknown> {
 export interface TopoEdgeData extends Record<string, unknown> {
   link: TopologyLink;
   dimmed: boolean;
+  highlighted: boolean;
   animate: boolean;
 }
 
@@ -32,6 +35,7 @@ export interface TopoEdgeData extends Record<string, unknown> {
  */
 export function nodeCountry(n: TopologyNode): string | null {
   const known = (c: unknown): c is string => typeof c === 'string' && c.length === 2 && c !== 'XX';
+  if (known(n.meta.countryManual)) return n.meta.countryManual;
   const fromService = n.service?.countryCode;
   if (known(fromService)) return fromService;
   return known(n.meta.countryCode) ? n.meta.countryCode : (fromService ?? null);
@@ -59,6 +63,23 @@ export const childPosition = (index: number) => ({
   y: GROUP_HEADER + index * (NODE_H + GROUP_PAD),
 });
 
+export interface MapFilter {
+  countries: string[];
+  onlineOnly: boolean;
+}
+
+/** Does a server card pass the filter? Pills and groups are never filtered by themselves. */
+export function passesFilter(n: TopologyNode, f: MapFilter | undefined): boolean {
+  if (!f || (f.countries.length === 0 && !f.onlineOnly)) return true;
+  if (n.kind === 'group' || variantOf(n) === 'external') return true;
+  if (f.onlineOnly && n.meta.online === false) return false;
+  if (f.countries.length > 0) {
+    const c = nodeCountry(n);
+    if (!c || !f.countries.includes(c)) return false;
+  }
+  return true;
+}
+
 export interface BuildOptions {
   showExternal: boolean;
   showService: boolean;
@@ -66,6 +87,8 @@ export interface BuildOptions {
   vertical: boolean;
   /** Positions computed by the layout for nodes that have none saved. */
   autoPositions: Map<string, { x: number; y: number }>;
+  /** Show only these countries / only nodes that are online (empty / false = no filtering). */
+  filter?: MapFilter;
   /** Node whose whole chain is highlighted; everything else is dimmed. */
   highlight: Set<string> | null;
   highlightEdges: Set<string> | null;
@@ -76,7 +99,9 @@ export function buildFlow(
   graph: TopologyGraph,
   o: BuildOptions,
 ): { nodes: Node<TopoNodeData>[]; edges: Edge<TopoEdgeData>[] } {
-  const visible = graph.nodes.filter((n) => !n.hidden && (o.showExternal || n.kind !== 'external'));
+  const visible = graph.nodes.filter(
+    (n) => !n.hidden && (o.showExternal || n.kind !== 'external') && passesFilter(n, o.filter),
+  );
   const ids = new Set(visible.map((n) => n.uuid));
   const childrenOf = new Map<string, TopologyNode[]>();
   for (const n of visible) {
@@ -114,6 +139,7 @@ export function buildFlow(
         node: n,
         childCount: kids,
         dimmed: o.highlight ? !o.highlight.has(n.uuid) : false,
+        highlighted: o.highlight ? o.highlight.has(n.uuid) : false,
         vertical: o.vertical,
       },
       ...(size ? { style: { width: size.width, height: size.height } } : {}),
@@ -133,6 +159,7 @@ export function buildFlow(
       data: {
         link: l,
         dimmed: o.highlightEdges ? !o.highlightEdges.has(l.uuid) : false,
+        highlighted: o.highlightEdges ? o.highlightEdges.has(l.uuid) : false,
         animate: o.animateEdges && l.animated && EDGE_STYLES[l.kind].traffic,
       },
     }));
@@ -140,31 +167,4 @@ export function buildFlow(
   return { nodes, edges };
 }
 
-/** Everything upstream and downstream of a node, following link direction (for hover highlight). */
-export function chainOf(
-  nodeId: string,
-  links: Pick<TopologyLink, 'uuid' | 'fromUuid' | 'toUuid'>[],
-): { nodes: Set<string>; edges: Set<string> } {
-  const nodes = new Set([nodeId]);
-  const edges = new Set<string>();
-  const walk = (start: string, forward: boolean) => {
-    const queue = [start];
-    const seen = new Set([start]);
-    while (queue.length) {
-      const cur = queue.shift()!;
-      for (const l of links) {
-        const [a, b] = forward ? [l.fromUuid, l.toUuid] : [l.toUuid, l.fromUuid];
-        if (a !== cur) continue;
-        edges.add(l.uuid);
-        nodes.add(b);
-        if (!seen.has(b)) {
-          seen.add(b);
-          queue.push(b);
-        }
-      }
-    }
-  };
-  walk(nodeId, true);
-  walk(nodeId, false);
-  return { nodes, edges };
-}
+export { chainOf } from './logic';

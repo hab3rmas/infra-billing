@@ -36,6 +36,8 @@ export const profiles = {
     testSent: 'Test message sent',
     testNotSent: 'Not sent: check the Telegram settings',
     confirmDelete: 'Delete the profile "{{name}}"? Its projects and services are kept.',
+    moveMapsConfirm:
+      'This profile has topology maps. Move them to "{{name}}"? OK = move, Cancel = leave them without a profile (visible only in All profiles).',
     created: 'Profile created',
     updated: 'Profile updated',
   },
@@ -77,6 +79,8 @@ export const profiles = {
     testSent: 'Тестовое сообщение отправлено',
     testNotSent: 'Не отправлено: проверьте настройки Telegram',
     confirmDelete: 'Удалить профиль «{{name}}»? Его проекты и сервисы сохранятся.',
+    moveMapsConfirm:
+      'У профиля есть схемы топологии. Перенести их в «{{name}}»? ОК = перенести, Отмена = оставить без профиля (видны только во «Всех профилях»).',
     created: 'Профиль создан',
     updated: 'Профиль обновлён',
   },
