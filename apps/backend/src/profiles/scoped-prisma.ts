@@ -144,9 +144,10 @@ export function createScopedPrisma<T extends PrismaClient>(base: T): T {
             throw new NotFoundException('Project not found');
           }
 
+          if (operation === 'create') args = await ownedCreate(base, model, args, scope);
           const result = await query(args);
           if (!extra) return result;
-          if (operation === 'create') await afterCreate(base, model, result, scope);
+          if (operation === 'create') registerCreated(model, result, scope);
           return postFilter(result, scope);
         },
       },
@@ -155,15 +156,53 @@ export function createScopedPrisma<T extends PrismaClient>(base: T): T {
   return extended as unknown as T;
 }
 
-/** New entities created inside a profile must be visible in it straight away. */
-async function afterCreate(base: PrismaClient, model: string, result: unknown, s: ProfileScope) {
+/**
+ * New entities created inside a profile must be visible in it straight away. The membership row is
+ * written as a NESTED create of the same statement, never as a second query on another connection:
+ * the entity may live in a transaction that is not committed yet (a map created together with its
+ * project), and a row pointing at it would break the foreign key.
+ */
+async function ownedCreate(
+  base: PrismaClient,
+  model: string,
+  args: Row,
+  s: ProfileScope,
+): Promise<Row> {
+  if (!s.profileUuid || !isRow(args.data)) return args;
+  const profileUuid = s.profileUuid;
+  if (model === 'Project') {
+    return {
+      ...args,
+      data: {
+        ...args.data,
+        profileProject: { create: { profile: { connect: { uuid: profileUuid } } } },
+      },
+    };
+  }
+  if (model !== 'ProviderAccount' && model !== 'Provider') return args;
+  // An empty account has no services, so tie it to the profile through its default project.
+  const profile = await base.profile.findUnique({ where: { uuid: profileUuid } });
+  const projectUuid = profile?.defaultProjectUuid ?? s.projectUuids[0];
+  if (!projectUuid) return args;
+  const withDefault = (account: Row): Row => ({
+    ...account,
+    defaultProject: { create: { projectUuid } },
+  });
+  if (model === 'ProviderAccount') return { ...args, data: withDefault(args.data) };
+  const accounts = args.data.accounts;
+  if (!isRow(accounts) || accounts.create === undefined) return args;
+  const create = Array.isArray(accounts.create)
+    ? accounts.create.map((a) => (isRow(a) ? withDefault(a) : a))
+    : isRow(accounts.create)
+      ? withDefault(accounts.create)
+      : accounts.create;
+  return { ...args, data: { ...args.data, accounts: { ...accounts, create } } };
+}
+
+/** Keep the in-memory scope in step with what the create just made visible. */
+function registerCreated(model: string, result: unknown, s: ProfileScope): void {
   if (!s.profileUuid || !isRow(result)) return;
   if (model === 'Project' && typeof result.uuid === 'string') {
-    await base.profileProject.upsert({
-      where: { projectUuid: result.uuid },
-      update: {},
-      create: { projectUuid: result.uuid, profileUuid: s.profileUuid },
-    });
     s.projectUuids.push(result.uuid);
     return;
   }
@@ -174,18 +213,8 @@ async function afterCreate(base: PrismaClient, model: string, result: unknown, s
     for (const a of result.accounts)
       if (isRow(a) && typeof a.uuid === 'string') accountUuids.push(a.uuid);
   }
-  if (accountUuids.length === 0) return;
-  // An empty account has no services, so tie it to the profile through its default project.
-  const profile = await base.profile.findUnique({ where: { uuid: s.profileUuid } });
-  const projectUuid = profile?.defaultProjectUuid ?? s.projectUuids[0];
-  if (!projectUuid) return;
-  for (const accountUuid of accountUuids) {
-    await base.accountDefaultProject.upsert({
-      where: { accountUuid },
-      update: {},
-      create: { accountUuid, projectUuid },
-    });
-    s.accountUuids.push(accountUuid);
-    s.homeAccountUuids.push(accountUuid);
+  for (const uuid of accountUuids) {
+    s.accountUuids.push(uuid);
+    s.homeAccountUuids.push(uuid);
   }
 }

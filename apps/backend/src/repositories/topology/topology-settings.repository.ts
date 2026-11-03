@@ -7,8 +7,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TopologySettingsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  ensure() {
-    return this.prisma.topologySettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  /**
+   * Read the row, creating it on first use. `INSERT … ON CONFLICT DO NOTHING` makes concurrent
+   * first requests safe (an `upsert` races and raises a unique violation).
+   */
+  async ensure() {
+    await this.prisma.topologySettings.createMany({ data: [{ id: 1 }], skipDuplicates: true });
+    return this.prisma.topologySettings.findUniqueOrThrow({ where: { id: 1 } });
   }
 
   async update(data: Prisma.TopologySettingsUpdateInput) {

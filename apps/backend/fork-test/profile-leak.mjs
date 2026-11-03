@@ -23,7 +23,13 @@ async function raw(method, path, { body, profile } = {}) {
   const set = res.headers.getSetCookie?.() ?? [];
   if (set.length) cookie = set.map((c) => c.split(';')[0]).join('; ');
   const text = await res.text();
-  return { status: res.status, text, json: text && text[0] !== '<' ? JSON.parse(text) : null };
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // not JSON (the Tabby YAML export): the leak check works on the text
+  }
+  return { status: res.status, text, json };
 }
 
 async function call(method, path, opts = {}, expected) {
@@ -39,6 +45,15 @@ const step = (n) => console.log(`- ${n}`);
 step('login');
 await raw('POST', '/api/auth/setup', { body: { username: 'owner', password: 'password123' } });
 await call('POST', '/auth/login', { body: { username: 'owner', password: 'password123' } });
+
+step('first use of the settings row is race-free (concurrent requests)');
+const parallel = await Promise.all(
+  Array.from({ length: 8 }, () => raw('GET', '/api/topology/settings')),
+);
+assert.ok(
+  parallel.every((r) => r.status === 200),
+  parallel.map((r) => r.status).join(','),
+);
 
 step('fixture: 2 profiles, separate and shared accounts, services, payments, maps');
 const proj = (name) => call('POST', '/projects', { body: { name: `${name}-${RUN}` } });
@@ -117,6 +132,21 @@ const mapB = await call('POST', '/topology/maps', {
   profile: B.uuid,
 });
 assert.equal(mapA.profileUuid, A.uuid, 'a map created inside a profile belongs to it');
+
+// A map created WITH a new project, inside a profile: the project joins the profile in the same
+// transaction (regression: the membership row used to be written outside it and broke the FK).
+const mapNew = await call('POST', '/topology/maps', {
+  body: { name: `map-new-${RUN}`, preset: 'web', createProject: { name: `Proj-${RUN}` } },
+  profile: A.uuid,
+});
+assert.equal(mapNew.profileUuid, A.uuid);
+const projsA = await call('GET', '/projects', { profile: A.uuid });
+assert.ok(
+  projsA.some((p) => p.uuid === mapNew.projectUuid),
+  'the new project is visible in the profile it was made in',
+);
+const projsB = await call('GET', '/projects', { profile: B.uuid });
+assert.ok(!projsB.some((p) => p.uuid === mapNew.projectUuid), 'and not in the other profile');
 
 // Account created inside profile B must be visible there straight away.
 const newProv = await call('POST', '/providers', {
