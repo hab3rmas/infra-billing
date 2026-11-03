@@ -20,6 +20,14 @@ export class TopologyServicesRepository {
     });
   }
 
+  /** Every service with the bits the SSH target lookup needs (meta holds the IPs). */
+  listWithMeta() {
+    return this.prisma.service.findMany({
+      select: { uuid: true, name: true, meta: true, countryCode: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async exists(uuid: string): Promise<boolean> {
     const found = await this.prisma.service.findUnique({ where: { uuid }, select: { uuid: true } });
     return found !== null;

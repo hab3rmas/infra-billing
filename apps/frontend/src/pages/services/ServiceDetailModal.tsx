@@ -1,3 +1,4 @@
+import { OpenInTabbyButton } from '@/components/fork/OpenInTabbyButton'; // fork:topology
 import type { Provider, Service } from '@infra/shared';
 import {
   IconBan,
@@ -187,6 +188,8 @@ export function ServiceDetailModal({
 
           <DialogFooter className="flex-row flex-wrap items-center gap-1.5 sm:justify-between">
             <div className="flex flex-1 items-center gap-1.5">
+              {/* fork:topology */}
+              <OpenInTabbyButton serviceUuid={shown.uuid} />
               {(shown.paymentsCount ?? 0) > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>

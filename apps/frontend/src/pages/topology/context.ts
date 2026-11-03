@@ -7,6 +7,8 @@ export interface TopologyActions {
   hideNode: (uuid: string) => void;
   /** false on mobile: view only. */
   editable: boolean;
+  /** Tabby buttons on cards; null = switched off in the settings. */
+  tabby: { defaultSshUser: string; defaultSshPort: number } | null;
 }
 
 export const TopologyActionsContext = createContext<TopologyActions | null>(null);

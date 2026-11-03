@@ -6,6 +6,7 @@ import { EntityLabel } from '@/components/EntityLabel';
 import { CardHeadRow } from '@/components/ink/CardHeadRow';
 import { InkGlyph } from '@/components/ink/InkGlyph';
 import { SortableTableHead } from '@/components/SortableTableHead';
+import { OpenInTabbyButton } from '@/components/fork/OpenInTabbyButton'; // fork:topology
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -222,6 +223,8 @@ export function ServicesTable({
                           <TooltipContent>{t('services.bumpTooltip')}</TooltipContent>
                         </Tooltip>
                       )}
+                      {/* fork:topology */}
+                      <OpenInTabbyButton serviceUuid={s.uuid} compact />
                     </div>
                   </TableCell>
                   <TableCell className="pr-6">

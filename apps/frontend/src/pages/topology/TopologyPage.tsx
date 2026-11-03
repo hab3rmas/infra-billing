@@ -1,6 +1,7 @@
 import type { TopologyMap } from '@infra/shared';
 import {
   IconCopy,
+  IconDownload,
   IconDots,
   IconLayoutDistributeHorizontal,
   IconPencil,
@@ -41,6 +42,7 @@ import { AddNodeDialog } from './panels/AddNodeDialog';
 import { LinkDialog, type LinkDialogState } from './panels/LinkDialog';
 import { MapDialog } from './panels/MapDialog';
 import { NodeSheet } from './panels/NodeSheet';
+import { TabbyExportDialog } from './panels/TabbyExportDialog';
 
 const SEGMENTED_MAX = 4;
 const parseLast = (raw: unknown): { map?: string } | null =>
@@ -82,6 +84,8 @@ export function TopologyPage() {
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [showService, setShowService] = useState(true);
+  const [tabbyOpen, setTabbyOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   const doSeed = async () => {
     if (!current) return;
@@ -158,6 +162,29 @@ export function TopologyPage() {
             />
           </div>
         )}
+        {graph && graph.nodes.length > 0 && (
+          <div className="w-44">
+            <Combobox
+              value={search}
+              onChange={(uuid) => {
+                setSearch('');
+                if (uuid) canvas.current?.focusNode(uuid);
+              }}
+              placeholder={t('topology.searchNode')}
+              options={graph.nodes
+                .filter((n) => !n.hidden)
+                .map((n) => ({
+                  value: n.uuid,
+                  label: n.label || n.service?.name || t('topology.unnamed'),
+                  keywords: [
+                    ...n.addresses.map((a) => a.value),
+                    n.service?.name ?? '',
+                    n.sshHost ?? '',
+                  ],
+                }))}
+            />
+          </div>
+        )}
         {!isMobile && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -202,6 +229,26 @@ export function TopologyPage() {
         <IconLayoutDistributeHorizontal className="size-4" />
         {t('topology.autoLayout')}
       </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost">
+            <IconDownload className="size-4" />
+            {t('topology.export')}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => canvas.current?.exportImage('png')}>
+            PNG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => canvas.current?.exportImage('svg')}>
+            SVG
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setTabbyOpen(true)}>
+            {t('tabby.exportMenu')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button size="sm" onClick={() => setAddOpen(true)}>
         <IconPlus className="size-4" />
         {t('topology.addNode')}
@@ -305,6 +352,7 @@ export function TopologyPage() {
             editable={!isMobile}
           />
           <AddNodeDialog open={addOpen} onOpenChange={setAddOpen} map={graph.map} />
+          <TabbyExportDialog open={tabbyOpen} onOpenChange={setTabbyOpen} />
           <LinkDialog state={linkDialog} onClose={() => setLinkDialog(null)} map={graph.map} />
         </>
       )}

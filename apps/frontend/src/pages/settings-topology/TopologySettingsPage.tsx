@@ -13,10 +13,56 @@ import {
 import { Combobox } from '@/components/Combobox';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
+import { TABBY_MIN_VERSION } from '@/lib/tabby';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { notifyError, notifySuccess } from '@/utils/notify';
+
+// Default SSH user and port, saved on blur so typing does not fire a request per key.
+function SshDefaults({
+  user,
+  port,
+  onSave,
+}: {
+  user: string;
+  port: number;
+  onSave: (patch: { defaultSshUser?: string; defaultSshPort?: number }) => void;
+}) {
+  const { t } = useTranslation();
+  const [u, setU] = useState(user);
+  const [p, setP] = useState(String(port));
+  const commit = () => {
+    const portNum = Number(p);
+    const valid = Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
+    if (!valid || !/^[a-z_][a-z0-9_.-]*$/i.test(u)) {
+      notifyError(t('tabby.defaultsInvalid'));
+      setU(user);
+      setP(String(port));
+      return;
+    }
+    if (u !== user || portNum !== port) onSave({ defaultSshUser: u, defaultSshPort: portNum });
+  };
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-2">
+        <Label htmlFor="ts-user">{t('tabby.defaultUser')}</Label>
+        <Input id="ts-user" value={u} onChange={(e) => setU(e.target.value)} onBlur={commit} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="ts-port">{t('tabby.defaultPort')}</Label>
+        <Input
+          id="ts-port"
+          inputMode="numeric"
+          value={p}
+          onChange={(e) => setP(e.target.value)}
+          onBlur={commit}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function TopologySettingsPage() {
   const { t } = useTranslation();
@@ -95,6 +141,33 @@ export function TopologySettingsPage() {
         <Button variant="ghost" onClick={openPreview} disabled={apply.isPending}>
           {t('topologySettings.applyExisting')}
         </Button>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-base font-medium">{t('tabby.settingsTitle')}</h2>
+          <p className="mt-1 text-sm text-ink-2">
+            {t('tabby.settingsHint', { version: TABBY_MIN_VERSION })}
+          </p>
+        </div>
+        {settings && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="ts-tabby">{t('tabby.enable')}</Label>
+              <Switch
+                id="ts-tabby"
+                checked={settings.tabbyEnabled}
+                onCheckedChange={(on) => toggle({ tabbyEnabled: on })}
+              />
+            </div>
+            <SshDefaults
+              key={`${settings.defaultSshUser}:${settings.defaultSshPort}`}
+              user={settings.defaultSshUser}
+              port={settings.defaultSshPort}
+              onSave={(patch) => toggle(patch)}
+            />
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">

@@ -19,6 +19,28 @@ export class TopologyNodesRepository {
     });
   }
 
+  /** Every node (all maps) with its service and the project of its map, for the Tabby export. */
+  listAll() {
+    return this.prisma.topologyNode.findMany({
+      where: { hidden: false, kind: { not: 'group' } },
+      orderBy: { createdAt: 'asc' },
+      include: { ...NODE_INCLUDE, map: { include: { project: { select: { name: true } } } } },
+    });
+  }
+
+  /** Give nodes a Tabby profile name (adopting the exported name), in one transaction. */
+  async setTabbyProfiles(names: Map<string, string>): Promise<number> {
+    const results = await this.prisma.$transaction(
+      [...names].map(([uuid, name]) =>
+        this.prisma.topologyNode.updateMany({
+          where: { uuid, tabbyProfile: null },
+          data: { tabbyProfile: name },
+        }),
+      ),
+    );
+    return results.reduce((sum, r) => sum + r.count, 0);
+  }
+
   findByUuid(uuid: string) {
     return this.prisma.topologyNode.findUnique({ where: { uuid }, include: NODE_INCLUDE });
   }

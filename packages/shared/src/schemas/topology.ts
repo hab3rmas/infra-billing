@@ -342,3 +342,20 @@ export const applyAccountProjectsResultSchema = z.object({
   ),
 });
 export type ApplyAccountProjectsResult = z.infer<typeof applyAccountProjectsResultSchema>;
+
+// ---- SSH / Tabby ----------------------------------------------------------
+
+/** Where to SSH for a billing service: used by the "Open in Tabby" button in the services table. */
+export const serviceSshTargetSchema = z.object({
+  serviceUuid: uuidSchema.describe('Service UUID'),
+  host: z.string().describe('SSH host'),
+  port: sshPortSchema.describe('SSH port'),
+  user: z.string().describe('SSH user'),
+  tabbyProfile: z.string().nullable().describe('Tabby profile name; null = quickConnect'),
+});
+export type ServiceSshTarget = z.infer<typeof serviceSshTargetSchema>;
+
+export const adoptTabbyProfilesResultSchema = z.object({
+  updated: z.number().int().nonnegative().describe('Nodes that got a tabbyProfile name'),
+});
+export type AdoptTabbyProfilesResult = z.infer<typeof adoptTabbyProfilesResultSchema>;

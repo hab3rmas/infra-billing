@@ -4,6 +4,7 @@ import { TopologyMapsRepository } from '@repositories/topology/topology-maps.rep
 import { TopologyNodesRepository } from '@repositories/topology/topology-nodes.repository';
 import { TopologyServicesRepository } from '@repositories/topology/topology-services.repository';
 import { TopologySettingsRepository } from '@repositories/topology/topology-settings.repository';
+import { TabbyService } from './tabby.service';
 import { TopologyController } from './topology.controller';
 import { TopologyService } from './topology.service';
 
@@ -12,6 +13,7 @@ import { TopologyService } from './topology.service';
   controllers: [TopologyController],
   providers: [
     TopologyService,
+    TabbyService,
     TopologyMapsRepository,
     TopologyNodesRepository,
     TopologyLinksRepository,

@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,10 +17,14 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { FORK_API, FORK_API_SUB, FORK_CONTROLLERS_INFO, ID_PARAM } from '@infra/shared';
 import {
+  AdoptTabbyProfilesResultDto,
+  ServiceSshTargetDto,
   CreateTopologyLinkDto,
   CreateTopologyMapDto,
   CreateTopologyNodeDto,
@@ -36,13 +41,17 @@ import {
   UpdateTopologyPositionsDto,
   UpdateTopologySettingsDto,
 } from './dto/topology.dto';
+import { TabbyService } from './tabby.service';
 import { TopologyService } from './topology.service';
 
 @ApiBearerAuth()
 @ApiTags(FORK_CONTROLLERS_INFO.TOPOLOGY.TAG)
 @Controller(FORK_API.TOPOLOGY)
 export class TopologyController {
-  constructor(private readonly topology: TopologyService) {}
+  constructor(
+    private readonly topology: TopologyService,
+    private readonly tabby: TabbyService,
+  ) {}
 
   @Get(FORK_API_SUB.TOPOLOGY_MAPS)
   @ApiOperation({ summary: 'List topology maps' })
@@ -164,5 +173,28 @@ export class TopologyController {
   @ApiOkResponse({ type: TopologySettingsDto })
   updateSettings(@Body() dto: UpdateTopologySettingsDto) {
     return this.topology.updateSettings(dto);
+  }
+
+  @Get(FORK_API_SUB.TOPOLOGY_TABBY_PROFILES)
+  @ApiOperation({ summary: 'Tabby config.yaml fragment with an SSH profile per node (no secrets)' })
+  @ApiProduces('application/yaml')
+  @ApiOkResponse({ description: 'YAML text', schema: { type: 'string' } })
+  async tabbyProfiles(@Res({ passthrough: true }) res: Response) {
+    res.setHeader('Content-Type', 'application/yaml; charset=utf-8');
+    return this.tabby.yaml();
+  }
+
+  @Post(FORK_API_SUB.TOPOLOGY_TABBY_ADOPT)
+  @ApiOperation({ summary: 'Set empty tabbyProfile fields to the exported profile names' })
+  @ApiOkResponse({ type: AdoptTabbyProfilesResultDto })
+  adoptTabbyProfiles() {
+    return this.tabby.adopt();
+  }
+
+  @Get(FORK_API_SUB.TOPOLOGY_SERVICE_TARGETS)
+  @ApiOperation({ summary: 'SSH target (host, port, user, Tabby profile) per billing service' })
+  @ApiOkResponse({ type: [ServiceSshTargetDto] })
+  serviceTargets() {
+    return this.tabby.serviceTargets();
   }
 }

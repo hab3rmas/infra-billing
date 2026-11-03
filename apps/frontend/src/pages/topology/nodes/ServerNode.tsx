@@ -1,4 +1,11 @@
-import { IconArrowDown, IconArrowUp, IconDots, IconEyeOff, IconPencil } from '@tabler/icons-react';
+import {
+  IconCopy,
+  IconArrowDown,
+  IconArrowUp,
+  IconDots,
+  IconEyeOff,
+  IconPencil,
+} from '@tabler/icons-react';
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -10,6 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TabbyLinkButton } from '@/components/fork/OpenInTabbyButton';
+import { resolveTabbyTarget } from '@/lib/tabby';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
 import { useTopologyActions } from '../context';
@@ -30,6 +39,7 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
     ? n.addresses
     : (svc?.ipCandidates ?? []).slice(0, 1).map((value) => ({ value, direction: 'both' as const }));
   const online = n.meta.online;
+  const tabby = actions.tabby ? resolveTabbyTarget(n, actions.tabby) : null;
   const [target, source] = data.vertical
     ? [Position.Top, Position.Bottom]
     : [Position.Left, Position.Right];
@@ -63,6 +73,11 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
             className={cn('size-2 shrink-0 rounded-full', online ? 'bg-ok' : 'bg-destructive')}
           />
         )}
+        {tabby && (
+          <span className="nodrag">
+            <TabbyLinkButton url={tabby.url} target={tabby.target} compact />
+          </span>
+        )}
         {actions.editable && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -79,6 +94,12 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
                 <IconPencil className="size-4" />
                 {t('common.edit')}
               </DropdownMenuItem>
+              {tabby && (
+                <DropdownMenuItem onSelect={() => void navigator.clipboard?.writeText(tabby.ssh)}>
+                  <IconCopy className="size-4" />
+                  {t('tabby.copySsh')}
+                </DropdownMenuItem>
+              )}
               {svc && (
                 <DropdownMenuItem asChild>
                   <Link to={`/services?selected=${svc.uuid}`}>{t('topology.openService')}</Link>

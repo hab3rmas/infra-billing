@@ -18,7 +18,7 @@ Work lives on `fork/topology`; `main` mirrors upstream. Task text: `FORK_TOPOLOG
 | 1. Skeleton and data (models, migrations, topology + account-projects modules) | done |
 | 1.5. Profiles | done |
 | 2. Topology page | done |
-| 3. Tabby | not started |
+| 3. Tabby | done |
 | 4. Remnawave | not started |
 | 5. Polish | not started |
 
@@ -42,13 +42,14 @@ Every insertion is marked `fork:topology` and sits at the end of its list.
 | `apps/frontend/src/layout/nav.ts` | items "Topology" (infrastructure) and settings "Profiles", "Topology settings" |
 | `apps/frontend/src/App.tsx` | routes `settings/profiles`, `settings/topology`, lazy `topology` |
 | `apps/frontend/src/i18n/index.ts` | `profiles`, `topology`, `topologySettings` namespaces (en, ru) |
-| `apps/frontend/package.json` | `@xyflow/react`, `elkjs` (the lockfile changes with it) |
+| `apps/frontend/package.json` | `@xyflow/react`, `elkjs`, `html-to-image` (the lockfile changes with it) |
+| `apps/frontend/src/pages/services/ServicesTable.tsx` | one `<OpenInTabbyButton serviceUuid compact />` in the next-billing cell + import |
+| `apps/frontend/src/pages/services/ServiceDetailModal.tsx` | one `<OpenInTabbyButton serviceUuid />` in the footer + import |
 
 Not touched (kept in fork files instead): `routes.ts` (see `fork-routes.ts`),
 `controllers-info.ts` (see `FORK_CONTROLLERS_INFO` in `fork-routes.ts`), the global
 `RepositoriesModule` (fork repositories are provided by the fork's own modules).
 
-Planned touch points (later stages): `ServicesTable.tsx`, `ServiceDetailModal.tsx`.
 
 ## New files
 
@@ -165,3 +166,20 @@ number, never an id). Re-check this table after every upstream merge, and run
 - Checks: `scripts/fork-capture-topology.mjs` (screenshots, light/dark), `scripts/fork-e2e-topology.mjs`
   (drag saves, hover dims, add node), `apps/backend/fork-test/seed-topology-demo.mjs` (the owner's VPN
   scheme and a website scheme through the API).
+
+## Tabby (stage 3)
+
+- `lib/tabby.ts` builds only `tabby://profile?profileName=` and `tabby://quickConnect?providerId=ssh&query=user@host:port`
+  (IPv6 in brackets). `run` and every other command are never generated (CVE-2026-45035; Tabby >= 1.0.233).
+  Verified against Tabby's `app/lib/cli.ts` (`profile [profileName]`, `quickConnect <providerId> <query>`)
+  and `tabby-ssh` (`options.host/port/user`).
+- Buttons: node card, node sheet (SSH block with a live preview of the command), services table and
+  service modal (`GET /topology/service-targets`: node host, else the service's first IP).
+  If the tab keeps focus 1.5 s after the click, a toast offers to copy the ssh command.
+- Export: `GET /topology/tabby-profiles` (YAML, ids `ssh:custom:<slug>:<node uuid>`, no secrets),
+  dialog on the topology page (download / copy), and `POST /topology/tabby-profiles/adopt` (with confirm)
+  to store the exported names as `tabbyProfile` so the profile deep link works at once.
+- Not done: command-palette entries "SSH: <name>" (would mean rewriting `CommandPalette.tsx`); a
+  "default mode" setting (a node uses its profile when it has one, quickConnect otherwise).
+- Tests: `fork-test/tabby.test.mjs` (the frontend module is bundled with esbuild inside the test),
+  `scripts/fork-e2e-tabby.mjs` (browser).

@@ -26,6 +26,7 @@
     "date-fns": "^4.4.0",
     "dayjs": "^1.11.21",
     "elkjs": "^0.12.1",
+    "html-to-image": "^1.11.13",
     "i18next": "^26.3.4",
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^1.23.0",

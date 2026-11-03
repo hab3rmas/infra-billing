@@ -38,6 +38,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/lib/theme';
 import { notifyError } from '@/utils/notify';
 import { TopologyActionsContext } from './context';
+import { exportGraphImage } from './exportImage';
 import { TrafficEdge } from './edges/TrafficEdge';
 import { type TopoEdgeData, type TopoNodeData, buildFlow, chainOf } from './graph';
 import { type Positions, layoutNodes, nodesNeedingLayout } from './layout';
@@ -57,6 +58,9 @@ export interface CanvasControl {
   /** Re-run the automatic layout for every node (manual positions included). */
   autoLayout: () => Promise<void>;
   fitView: () => void;
+  /** Centre the view on one node (node search). */
+  focusNode: (uuid: string) => void;
+  exportImage: (format: 'png' | 'svg') => Promise<void>;
 }
 
 interface Props {
@@ -92,6 +96,8 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
 
   const [auto, setAuto] = useState<Positions>(new Map());
   const [hover, setHover] = useState<string | null>(null);
+  // Picked through search: highlighted like a hover until the pane is clicked.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node<TopoNodeData>[]>([]);
 
   // Nodes without saved coordinates get an elk layout once; it is saved so it stays put afterwards.
@@ -118,7 +124,8 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
   }, [layoutKey, settings.layoutDirection]);
 
   // Hover highlight: the whole chain through a node, everything else dimmed.
-  const chain = useMemo(() => (hover ? chainOf(hover, graph.links) : null), [hover, graph.links]);
+  const focus = hover ?? selectedId;
+  const chain = useMemo(() => (focus ? chainOf(focus, graph.links) : null), [focus, graph.links]);
 
   const base = useMemo(
     () =>
@@ -219,6 +226,12 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
         setTimeout(() => rf.fitView({ duration: 300 }), 50);
       },
       fitView: () => rf.fitView({ duration: 300 }),
+      focusNode: (uuid) => {
+        rf.fitView({ nodes: [{ id: uuid }], duration: 400, maxZoom: 1.2, padding: 1.5 });
+        setSelectedId(uuid);
+      },
+      exportImage: (format) =>
+        exportGraphImage(rf.getNodes(), format, `topology-${graph.map.name}`.replace(/\s+/g, '-')),
     }),
     [graph, settings.layoutDirection, persist, rf],
   );
@@ -240,8 +253,11 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
           { onError: (e) => notifyError(apiErrorMessage(e)) },
         ),
       editable,
+      tabby: settings.tabbyEnabled
+        ? { defaultSshUser: settings.defaultSshUser, defaultSshPort: settings.defaultSshPort }
+        : null,
     }),
-    [onOpenNode, updateNode, editable],
+    [onOpenNode, updateNode, editable, settings],
   );
 
   return (
@@ -262,6 +278,7 @@ function Canvas({ graph, showService, controlRef, onOpenNode, onLink, onSeed, se
         }}
         onNodeMouseEnter={(_, n) => setHover(n.id)}
         onNodeMouseLeave={() => setHover(null)}
+        onPaneClick={() => setSelectedId(null)}
         // Delete / Backspace asks first, performs the delete itself and keeps the canvas in sync
         // through the refetch (hence `false`).
         onBeforeDelete={async ({ nodes: ns, edges: es }) => {

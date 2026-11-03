@@ -7,6 +7,8 @@ import {
   type CreateTopologyNode,
   FORK_API_PATH,
   type SeedResult,
+  type ServiceSshTarget,
+  type AdoptTabbyProfilesResult,
   type TopologyGraph,
   type TopologyLink,
   type TopologyMap,
@@ -180,6 +182,30 @@ export function useProjectStatsFor(projectUuid: string | null | undefined) {
     queryKey: ['analytics', 'project-stats', projectUuid],
     enabled: Boolean(projectUuid),
     queryFn: async () => (await api.get<ProjectStats>(API_PATH.PROJECTS.STATS(projectUuid!))).data,
+  });
+}
+
+/** SSH target per billing service, for the "Open in Tabby" buttons. */
+export function useServiceSshTargets() {
+  return useQuery({
+    queryKey: ['topology', 'service-targets'],
+    queryFn: async () =>
+      (await api.get<ServiceSshTarget[]>(FORK_API_PATH.TOPOLOGY.SERVICE_TARGETS)).data,
+    staleTime: 60_000,
+  });
+}
+
+export async function fetchTabbyYaml(): Promise<string> {
+  return (await api.get<string>(FORK_API_PATH.TOPOLOGY.TABBY_PROFILES, { responseType: 'text' }))
+    .data;
+}
+
+export function useAdoptTabbyProfiles() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      (await api.post<AdoptTabbyProfilesResult>(FORK_API_PATH.TOPOLOGY.TABBY_ADOPT)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['topology'] }),
   });
 }
 

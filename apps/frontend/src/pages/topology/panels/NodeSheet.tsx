@@ -1,6 +1,6 @@
 import type { TopologyGraph, TopologyNode, TopologyNodeRole } from '@infra/shared';
 import { TOPOLOGY_NODE_ROLES } from '@infra/shared';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCopy, IconPlus, IconTrash } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/client';
 import { useDeleteNode, useUpdateNode } from '@/api/topology';
 import { Combobox } from '@/components/Combobox';
+import { TabbyLinkButton } from '@/components/fork/OpenInTabbyButton';
+import { resolveTabbyTarget } from '@/lib/tabby';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,6 +47,10 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
   const [role, setRole] = useState<TopologyNodeRole>('other');
   const [parentUuid, setParentUuid] = useState('');
   const [addresses, setAddresses] = useState<Addr[]>([]);
+  const [sshHost, setSshHost] = useState('');
+  const [sshPort, setSshPort] = useState('');
+  const [sshUser, setSshUser] = useState('');
+  const [tabbyProfile, setTabbyProfile] = useState('');
 
   useEffect(() => {
     if (!node) return;
@@ -52,6 +58,10 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
     setRole(node.role);
     setParentUuid(node.parentUuid ?? '');
     setAddresses(node.addresses);
+    setSshHost(node.sshHost ?? '');
+    setSshPort(node.sshPort?.toString() ?? '');
+    setSshUser(node.sshUser ?? '');
+    setTabbyProfile(node.tabbyProfile ?? '');
   }, [node]);
 
   if (!node) return <Sheet open={false} />;
@@ -63,7 +73,25 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
   const links = graph.links.filter((l) => l.fromUuid === node.uuid || l.toUuid === node.uuid);
   const groups = graph.nodes.filter((n) => n.kind === 'group' && n.uuid !== node.uuid);
 
+  // What the buttons would open, from the unsaved form values.
+  const preview = resolveTabbyTarget(
+    {
+      ...node,
+      sshHost: sshHost.trim() || null,
+      sshPort: Number(sshPort) || null,
+      sshUser: sshUser.trim() || null,
+      tabbyProfile: tabbyProfile.trim() || null,
+      addresses,
+    },
+    graph.settings,
+  );
+
   const save = async () => {
+    const port = sshPort.trim() === '' ? null : Number(sshPort);
+    if (port !== null && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      notifyError(t('tabby.portInvalid'));
+      return;
+    }
     try {
       await update.mutateAsync({
         uuid: node.uuid,
@@ -72,6 +100,10 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
           role,
           parentUuid: parentUuid || null,
           addresses: addresses.filter((a) => a.value.trim()),
+          sshHost: sshHost.trim() || null,
+          sshPort: port,
+          sshUser: sshUser.trim() || null,
+          tabbyProfile: tabbyProfile.trim() || null,
         },
       });
       notifySuccess(t('topology.nodeSaved'));
@@ -212,6 +244,61 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('tabby.ssh')}</Label>
+            <div className="grid grid-cols-[1fr_5rem_8rem] gap-2">
+              <Input
+                className="font-mono"
+                aria-label={t('tabby.host')}
+                placeholder={t('tabby.host')}
+                value={sshHost}
+                disabled={!editable}
+                onChange={(e) => setSshHost(e.target.value)}
+              />
+              <Input
+                aria-label={t('tabby.port')}
+                placeholder={String(graph.settings.defaultSshPort)}
+                inputMode="numeric"
+                value={sshPort}
+                disabled={!editable}
+                onChange={(e) => setSshPort(e.target.value)}
+              />
+              <Input
+                aria-label={t('tabby.user')}
+                placeholder={graph.settings.defaultSshUser}
+                value={sshUser}
+                disabled={!editable}
+                onChange={(e) => setSshUser(e.target.value)}
+              />
+            </div>
+            <Input
+              aria-label={t('tabby.profile')}
+              placeholder={t('tabby.profilePlaceholder')}
+              value={tabbyProfile}
+              disabled={!editable}
+              onChange={(e) => setTabbyProfile(e.target.value)}
+            />
+            <p className="text-xs text-ink-2">{t('tabby.noSecrets')}</p>
+            {preview && (
+              <div className="flex gap-2">
+                {graph.settings.tabbyEnabled && (
+                  <TabbyLinkButton url={preview.url} target={preview.target} />
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void navigator.clipboard?.writeText(preview.ssh)}
+                >
+                  <IconCopy className="size-4" />
+                  {t('tabby.copySsh')}
+                </Button>
+                <span className="self-center truncate font-mono text-xs text-ink-3">
+                  {preview.ssh}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
