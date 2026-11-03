@@ -22,7 +22,7 @@ import { resolveTabbyTarget } from '@/lib/tabby';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/utils/format';
 import { useTopologyActions } from '../context';
-import type { TopoNodeData } from '../graph';
+import { type TopoNodeData, nodeCountry } from '../graph';
 import { ROLES } from '../roles';
 
 // Quiet card in the panel's own tokens. VPN roles get an accent badge; infra and web roles stay
@@ -38,6 +38,7 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
   const addresses = n.addresses.length
     ? n.addresses
     : (svc?.ipCandidates ?? []).slice(0, 1).map((value) => ({ value, direction: 'both' as const }));
+  const country = nodeCountry(n);
   const online = n.meta.online;
   const tabby = actions.tabby ? resolveTabbyTarget(n, actions.tabby) : null;
   const [target, source] = data.vertical
@@ -64,7 +65,7 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
         ) : (
           <RoleIcon aria-hidden stroke={1.5} className="size-5 shrink-0 text-ink-3" />
         )}
-        {svc && <CountryFlag code={svc.countryCode} className="text-sm" />}
+        {country && <CountryFlag code={country} className="text-sm" />}
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
         {online !== undefined && (
           <span

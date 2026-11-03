@@ -328,7 +328,7 @@ export function buildTopologyFromRemnawave(snap: RwSnapshot): ImportResult {
         serviceUuid: null,
         parentKey: groupKey,
         addresses: outAddrs.map((value) => ({ value, direction: 'out' as const, label: 'IP B' })),
-        meta: { splitOf: n.uuid },
+        meta: { splitOf: n.uuid, countryCode: n.countryCode },
       });
       links.set(k('inner', n.uuid), {
         sourceKey: k('inner', n.uuid),

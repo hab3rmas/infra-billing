@@ -26,6 +26,17 @@ export interface TopoEdgeData extends Record<string, unknown> {
   animate: boolean;
 }
 
+/**
+ * Country of a node for its flag: the billing service's, else the one Remnawave reports for the
+ * node. An unknown service country ('XX') does not hide a known Remnawave one.
+ */
+export function nodeCountry(n: TopologyNode): string | null {
+  const known = (c: unknown): c is string => typeof c === 'string' && c.length === 2 && c !== 'XX';
+  const fromService = n.service?.countryCode;
+  if (known(fromService)) return fromService;
+  return known(n.meta.countryCode) ? n.meta.countryCode : (fromService ?? null);
+}
+
 // External-kind nodes with a server role (a panel or bot without a billing service) are cards too.
 export const variantOf = (n: TopologyNode): NodeVariant =>
   n.kind === 'group'
