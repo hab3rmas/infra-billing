@@ -13,6 +13,7 @@ export const FORK_API = {
   TOPOLOGY: 'topology',
   ACCOUNT_PROJECTS: 'account-projects',
   PROFILES: 'profiles',
+  REMNAWAVE: 'remnawave',
 } as const;
 
 /** Method sub-paths within a controller. */
@@ -36,6 +37,11 @@ export const FORK_API_SUB = {
   PROFILE_PROJECTS: `${ID}/projects`,
   PROFILE_TEST: `${ID}/test-notification`,
   PROFILES_CONFIG: 'config',
+  RW_INTEGRATIONS: 'integrations',
+  RW_INTEGRATION_BY_ID: `integrations/${ID}`,
+  RW_TEST: `integrations/${ID}/test`,
+  RW_SYNC: `integrations/${ID}/sync`,
+  RW_REVEAL: `integrations/${ID}/credentials/reveal`,
 } as const;
 
 const path = (controller: string, sub?: string): string =>
@@ -66,6 +72,14 @@ export const FORK_API_PATH = {
     BY_ACCOUNT: (accountUuid: string) => `/${FORK_API.ACCOUNT_PROJECTS}/${accountUuid}`,
     APPLY: path(FORK_API.ACCOUNT_PROJECTS, FORK_API_SUB.ACCOUNT_PROJECTS_APPLY),
   },
+  REMNAWAVE: {
+    INTEGRATIONS: path(FORK_API.REMNAWAVE, FORK_API_SUB.RW_INTEGRATIONS),
+    INTEGRATION: (uuid: string) =>
+      pathId(FORK_API.REMNAWAVE, FORK_API_SUB.RW_INTEGRATION_BY_ID, uuid),
+    TEST: (uuid: string) => pathId(FORK_API.REMNAWAVE, FORK_API_SUB.RW_TEST, uuid),
+    SYNC: (uuid: string) => pathId(FORK_API.REMNAWAVE, FORK_API_SUB.RW_SYNC, uuid),
+    REVEAL: (uuid: string) => pathId(FORK_API.REMNAWAVE, FORK_API_SUB.RW_REVEAL, uuid),
+  },
   PROFILES: {
     ROOT: path(FORK_API.PROFILES),
     CONFIG: path(FORK_API.PROFILES, FORK_API_SUB.PROFILES_CONFIG),
@@ -85,5 +99,6 @@ export const FORK_CONTROLLERS_INFO = {
     TAG: 'Account Projects',
     DESCRIPTION: 'Default project for new services synced from a provider account',
   },
+  REMNAWAVE: { TAG: 'Remnawave', DESCRIPTION: 'Import of Remnawave panels into topology maps' },
   PROFILES: { TAG: 'Profiles', DESCRIPTION: 'Workspaces that group projects (VPN, Site 1…)' },
 } as const;

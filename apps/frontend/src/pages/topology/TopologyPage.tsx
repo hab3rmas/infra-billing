@@ -6,12 +6,13 @@ import {
   IconLayoutDistributeHorizontal,
   IconPencil,
   IconPlus,
+  IconRefresh,
   IconSitemap,
   IconTrash,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/client';
 import { useProjects } from '@/api/projects';
 import {
@@ -21,6 +22,7 @@ import {
   useTopologyGraph,
   useTopologyMaps,
 } from '@/api/topology';
+import { useRemnawaveIntegrations, useSyncRemnawave } from '@/api/remnawave';
 import { Combobox } from '@/components/Combobox';
 import { EntityLabel } from '@/components/EntityLabel';
 import { PageHeader } from '@/components/PageHeader';
@@ -32,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePersistedState } from '@/hooks/usePersistedState';
@@ -85,6 +88,29 @@ export function TopologyPage() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [showService, setShowService] = useState(true);
   const [tabbyOpen, setTabbyOpen] = useState(false);
+  const { data: integrations } = useRemnawaveIntegrations();
+  const rwSync = useSyncRemnawave();
+  const mapIntegrations = (integrations ?? []).filter(
+    (i) => i.mapUuid === current?.uuid && i.enabled,
+  );
+  const failed = mapIntegrations.find((i) => i.lastSyncError);
+
+  const doRwSync = async () => {
+    for (const i of mapIntegrations) {
+      try {
+        const r = await rwSync.mutateAsync(i.uuid);
+        notifySuccess(
+          t('remnawave.syncDone', {
+            nodes: r.nodesCreated + r.nodesUpdated,
+            links: r.linksCreated + r.linksUpdated,
+            removed: r.linksRemoved + r.nodesHidden,
+          }),
+        );
+      } catch (e) {
+        notifyError(apiErrorMessage(e));
+      }
+    }
+  };
   const [search, setSearch] = useState('');
 
   const doSeed = async () => {
@@ -162,29 +188,6 @@ export function TopologyPage() {
             />
           </div>
         )}
-        {graph && graph.nodes.length > 0 && (
-          <div className="w-44">
-            <Combobox
-              value={search}
-              onChange={(uuid) => {
-                setSearch('');
-                if (uuid) canvas.current?.focusNode(uuid);
-              }}
-              placeholder={t('topology.searchNode')}
-              options={graph.nodes
-                .filter((n) => !n.hidden)
-                .map((n) => ({
-                  value: n.uuid,
-                  label: n.label || n.service?.name || t('topology.unnamed'),
-                  keywords: [
-                    ...n.addresses.map((a) => a.value),
-                    n.service?.name ?? '',
-                    n.sshHost ?? '',
-                  ],
-                }))}
-            />
-          </div>
-        )}
         {!isMobile && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -222,13 +225,16 @@ export function TopologyPage() {
 
   const actions = current && !isMobile && (
     <>
-      <Button size="sm" variant="ghost" onClick={() => setShowService((v) => !v)}>
-        {showService ? t('topology.hideService') : t('topology.showService')}
-      </Button>
       <Button size="sm" variant="ghost" onClick={() => canvas.current?.autoLayout()}>
         <IconLayoutDistributeHorizontal className="size-4" />
         {t('topology.autoLayout')}
       </Button>
+      {mapIntegrations.length > 0 && (
+        <Button size="sm" variant="ghost" onClick={doRwSync} disabled={rwSync.isPending}>
+          <IconRefresh className={cn('size-4', rwSync.isPending && 'animate-spin')} />
+          {t('remnawave.syncShort')}
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button size="sm" variant="ghost">
@@ -304,11 +310,51 @@ export function TopologyPage() {
   return (
     <>
       {header}
+      {failed && (
+        <Alert variant="destructive" className="mb-3">
+          <AlertDescription>
+            {t('remnawave.syncFailed', { name: failed.name })}: {failed.lastSyncError}
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="relative h-[calc(100dvh-8rem)] min-h-96 overflow-hidden rounded-xl border border-border">
         {graphLoading || !graph ? (
           <Skeleton className="size-full" />
         ) : (
           <>
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+              {graph && graph.nodes.length > 0 && (
+                <div className="w-48">
+                  <Combobox
+                    value={search}
+                    onChange={(uuid) => {
+                      setSearch('');
+                      if (uuid) canvas.current?.focusNode(uuid);
+                    }}
+                    placeholder={t('topology.searchNode')}
+                    options={graph.nodes
+                      .filter((n) => !n.hidden)
+                      .map((n) => ({
+                        value: n.uuid,
+                        label: n.label || n.service?.name || t('topology.unnamed'),
+                        keywords: [
+                          ...n.addresses.map((a) => a.value),
+                          n.service?.name ?? '',
+                          n.sshHost ?? '',
+                        ],
+                      }))}
+                  />
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-card"
+                onClick={() => setShowService((v) => !v)}
+              >
+                {showService ? t('topology.hideService') : t('topology.showService')}
+              </Button>
+            </div>
             <TopologyCanvas
               graph={graph}
               showService={showService}
@@ -332,6 +378,11 @@ export function TopologyPage() {
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setAddOpen(true)}>
                         {t('topology.addNode')}
+                      </Button>
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to={`/settings/topology?map=${current?.uuid}`}>
+                          {t('remnawave.connectToMap')}
+                        </Link>
                       </Button>
                     </div>
                   )}

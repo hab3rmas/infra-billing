@@ -1,6 +1,7 @@
 import type { ApplyAccountProjectsResult } from '@infra/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/client';
 import { useProjects } from '@/api/projects';
 import {
@@ -11,6 +12,7 @@ import {
   useUpdateTopologySettings,
 } from '@/api/topology';
 import { Combobox } from '@/components/Combobox';
+import { RemnawaveSection } from './RemnawaveSection';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { TABBY_MIN_VERSION } from '@/lib/tabby';
@@ -66,6 +68,7 @@ function SshDefaults({
 
 export function TopologySettingsPage() {
   const { t } = useTranslation();
+  const [params] = useSearchParams();
   const { data: rows } = useAccountProjects();
   const { data: projects } = useProjects();
   const { data: settings } = useTopologySettings();
@@ -142,6 +145,8 @@ export function TopologySettingsPage() {
           {t('topologySettings.applyExisting')}
         </Button>
       </section>
+
+      <RemnawaveSection preselectMap={params.get('map')} />
 
       <section className="space-y-4">
         <div>

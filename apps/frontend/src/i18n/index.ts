@@ -6,7 +6,7 @@ import { common } from './locales/common';
 import { dashboard } from './locales/dashboard';
 import { payments } from './locales/payments';
 import { profiles } from './locales/profiles'; // fork:topology
-import { tabby, topology, topologySettings } from './locales/topology'; // fork:topology
+import { remnawave, tabby, topology, topologySettings } from './locales/topology'; // fork:topology
 import { projects } from './locales/projects';
 import { providers } from './locales/providers';
 import { services } from './locales/services';
@@ -33,6 +33,7 @@ const resources = {
       topology: topology.en, // fork:topology
       topologySettings: topologySettings.en, // fork:topology
       tabby: tabby.en, // fork:topology
+      remnawave: remnawave.en, // fork:topology
       timezones: timezones.en,
     },
   },
@@ -51,6 +52,7 @@ const resources = {
       topology: topology.ru, // fork:topology
       topologySettings: topologySettings.ru, // fork:topology
       tabby: tabby.ru, // fork:topology
+      remnawave: remnawave.ru, // fork:topology
       timezones: timezones.ru,
     },
   },

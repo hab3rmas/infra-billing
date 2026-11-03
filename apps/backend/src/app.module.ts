@@ -28,6 +28,7 @@ import { McpModule } from './mcp/mcp.module';
 import { TopologyModule } from './topology/topology.module'; // fork:topology
 import { AccountProjectsModule } from './account-projects/account-projects.module'; // fork:topology
 import { ProfilesCoreModule, ProfilesModule } from './profiles/profiles.module'; // fork:topology
+import { RemnawaveModule } from './remnawave/remnawave.module'; // fork:topology
 import { AllExceptionsFilter } from '@common/all-exceptions.filter';
 
 // Built SPA lives at apps/frontend/dist; from compiled backend (apps/backend/dist)
@@ -61,6 +62,7 @@ const FRONTEND_DIST = join(__dirname, '..', '..', 'frontend', 'dist');
     AccountProjectsModule, // fork:topology
     ProfilesCoreModule, // fork:topology
     ProfilesModule, // fork:topology
+    RemnawaveModule, // fork:topology
     // SPA fallback for all non-API routes.
     ServeStaticModule.forRoot({
       rootPath: FRONTEND_DIST,

@@ -20,3 +20,4 @@ export * from './schemas/api-token';
 export * from './fork-routes';
 export * from './schemas/topology';
 export * from './schemas/profile';
+export * from './schemas/remnawave';

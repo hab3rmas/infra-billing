@@ -19,7 +19,7 @@ Work lives on `fork/topology`; `main` mirrors upstream. Task text: `FORK_TOPOLOG
 | 1.5. Profiles | done |
 | 2. Topology page | done |
 | 3. Tabby | done |
-| 4. Remnawave | not started |
+| 4. Remnawave | done |
 | 5. Polish | not started |
 
 ## Touch points in upstream files
@@ -36,7 +36,7 @@ Every insertion is marked `fork:topology` and sits at the end of its list.
 | `apps/backend/prisma/schema/project.prisma` | (also) back-relation `profileProject` |
 | `apps/backend/src/prisma/prisma.module.ts` | provides `PrismaBase` and the scoped client under the `PrismaService` token |
 | `apps/backend/src/notifications/notifications.module.ts` | `NotificationsService` / `TelegramService` provided via profile-aware subclasses |
-| `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule` |
+| `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule`, `RemnawaveModule` |
 | `apps/frontend/src/main.tsx` | `import './lib/profileScope'` (adds the `X-Profile` header to the axios client) |
 | `apps/frontend/src/layout/AppLayout.tsx` | `<ProfileSwitcher />` in the sidebar header, `<ProfileBadge />` next to the breadcrumb |
 | `apps/frontend/src/layout/nav.ts` | items "Topology" (infrastructure) and settings "Profiles", "Topology settings" |
@@ -183,3 +183,40 @@ number, never an id). Re-check this table after every upstream merge, and run
   "default mode" setting (a node uses its profile when it has one, quickConnect otherwise).
 - Tests: `fork-test/tabby.test.mjs` (the frontend module is bundled with esbuild inside the test),
   `scripts/fork-e2e-tabby.mjs` (browser).
+
+## Remnawave (stage 4)
+
+- Files: `src/remnawave/` (`remnawave.importer.ts` pure conversion, `remnawave.plan.ts` pure diff,
+  `remnawave.match.ts`, `remnawave.parse.ts`, `remnawave.url.ts`, `remnawave.client.ts`,
+  `remnawave.service.ts`, controller, module), `src/repositories/remnawave/`, and on the frontend
+  `api/remnawave.ts`, `pages/settings-topology/RemnawaveSection.tsx`.
+- API shapes (`/api/nodes`, `/api/config-profiles[/{uuid}[/computed-config]]`, `/api/hosts`, the
+  `{ response: … }` wrapper) follow the task text; they were NOT checked against a live panel, only
+  against a mock with the owner's scheme. Parsers are tolerant (unknown fields ignored, junk skipped
+  with a warning). If a real response differs, adjust `remnawave.parse.ts` and re-run
+  `fork-test/remnawave-importer.test.mjs`.
+- Importer: nodes (roles from the outbound graph), `vless`/`vmess`/`trojan`/`shadowsocks`/`hysteria*`
+  outbounds into links (bridge / chain), `wireguard` to `engage.cloudflareclient.com` or a `warp` tag
+  into a shared WARP node, `freedom` into Internet (exit) or RU sites (direct, on bridges and for RU
+  geo rules), `sendThrough` / `listen` IPs into a group with A (in) and B (out), routing rules into
+  `route` (one link per `vlessRoute`; routeless geo rules fold into the routed links), hosts into
+  Clients to node links, panel and subscription page nodes with dashed management links.
+- Sync keeps hand-made content: manual links are never touched; hidden imported links stay hidden;
+  owner edits are flagged in `meta` (`roleOverridden`, `labelOverridden`, `addressesOverridden`,
+  `serviceOverridden`, link `overridden[]`) and win over the importer; positions are never changed.
+  Links gone from the panel are removed, nodes gone from the panel are hidden. Keys include the
+  integration uuid, so two panels on one map do not overwrite each other. A node already bound on the
+  map (unique per map) is added without the binding and a warning is returned.
+- Billing service match: by IP (the node address, or its DNS A records, 3 s timeout), then by name;
+  the map's project first; ambiguity gives a warning and no link.
+- Security: the base URL must be `https://` (`http://` only for localhost and private addresses),
+  no redirects are followed, the token and headers are AES-GCM encrypted, never returned by the API
+  (`tokenSet`/`extraHeadersSet` only), never logged, never in `lastSnapshot` or error messages;
+  reveal is `POST …/credentials/reveal`, session only. Only secret-free messages are stored as
+  `lastSyncError`.
+- Autosync: a 5-minute tick runs every enabled `autoSync` integration, one after another, once the
+  `Settings.syncIntervalHours` interval has passed. A failing panel does not stop the others.
+- Not done: grouping the panel and a node into one container when they share a server.
+- Tests: `fork-test/remnawave-importer.test.mjs`, `remnawave-plan.test.mjs` (fixtures:
+  `remnawave-fixtures.mjs`), `remnawave-e2e.mjs` (API against a running panel and a mock Remnawave),
+  `scripts/fork-e2e-remnawave.mjs` (browser).

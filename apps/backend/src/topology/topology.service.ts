@@ -173,12 +173,24 @@ export class TopologyService {
     }
     if (dto.parentUuid) await this.ensureParent(node.mapUuid, dto.parentUuid, uuid);
     const data: Prisma.TopologyNodeUncheckedUpdateInput = {};
+    // Fields the owner really changed on an imported node: the importer must leave them alone.
+    const owned: Record<string, boolean> = {};
     if (dto.role !== undefined) {
       data.role = dto.role;
-      // The importer must not overwrite a role the owner set by hand.
-      if (node.source === 'remnawave') {
-        data.meta = { ...asObject(node.meta), roleOverridden: true } as Prisma.InputJsonValue;
-      }
+      if (dto.role !== node.role) owned.roleOverridden = true;
+    }
+    if (dto.label !== undefined && (dto.label ?? null) !== node.label) owned.labelOverridden = true;
+    if (
+      dto.addresses !== undefined &&
+      JSON.stringify(dto.addresses) !== JSON.stringify(node.addresses)
+    ) {
+      owned.addressesOverridden = true;
+    }
+    if (dto.serviceUuid !== undefined && dto.serviceUuid !== node.serviceUuid) {
+      owned.serviceOverridden = true;
+    }
+    if (node.source === 'remnawave' && Object.keys(owned).length > 0) {
+      data.meta = { ...asObject(node.meta), ...owned } as Prisma.InputJsonValue;
     }
     if (dto.label !== undefined) data.label = dto.label;
     if (dto.serviceUuid !== undefined) data.serviceUuid = dto.serviceUuid;
@@ -250,14 +262,23 @@ export class TopologyService {
     if (dto.animated !== undefined) data.animated = dto.animated;
     if (dto.hidden !== undefined) data.hidden = dto.hidden;
     if (link.source === 'remnawave') {
-      // Remember what the owner changed so the importer keeps it on the next sync.
-      const overridden = new Set<string>(
-        asStringArray(asObject(link.meta).overridden).concat(Object.keys(data)),
+      // Remember what the owner really changed so the importer keeps it on the next sync.
+      const current: Record<string, unknown> = {
+        kind: link.kind,
+        label: link.label,
+        route: link.route,
+        protocol: link.protocol,
+      };
+      const changed = ['kind', 'label', 'route', 'protocol'].filter(
+        (f) => f in data && (data as Record<string, unknown>)[f] !== current[f],
       );
-      data.meta = {
-        ...asObject(link.meta),
-        overridden: [...overridden],
-      } as Prisma.InputJsonValue;
+      if (changed.length > 0) {
+        const overridden = new Set<string>(asStringArray(asObject(link.meta).overridden).concat(changed));
+        data.meta = {
+          ...asObject(link.meta),
+          overridden: [...overridden],
+        } as Prisma.InputJsonValue;
+      }
     }
     return mapTopologyLink(await this.links.update(uuid, data));
   }

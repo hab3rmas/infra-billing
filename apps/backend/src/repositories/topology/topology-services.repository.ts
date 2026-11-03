@@ -23,7 +23,7 @@ export class TopologyServicesRepository {
   /** Every service with the bits the SSH target lookup needs (meta holds the IPs). */
   listWithMeta() {
     return this.prisma.service.findMany({
-      select: { uuid: true, name: true, meta: true, countryCode: true },
+      select: { uuid: true, name: true, meta: true, countryCode: true, projectUuid: true },
       orderBy: { createdAt: 'asc' },
     });
   }
