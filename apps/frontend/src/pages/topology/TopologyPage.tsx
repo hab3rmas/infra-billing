@@ -322,7 +322,7 @@ export function TopologyPage() {
           <Skeleton className="size-full" />
         ) : (
           <>
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+            <div className="absolute top-3 right-3 z-10 hidden items-center gap-2 md:flex">
               {graph && graph.nodes.length > 0 && (
                 <div className="w-48">
                   <Combobox

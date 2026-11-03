@@ -21,7 +21,7 @@ export function ProjectSummary({
   editable: boolean;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => !window.matchMedia('(max-width: 767px)').matches);
   const projectUuid = graph.map.projectUuid;
   const { data: stats } = useProjectStatsFor(projectUuid);
   const { data: services } = useServices(projectUuid ? { projectUuid, isActive: true } : {}, {

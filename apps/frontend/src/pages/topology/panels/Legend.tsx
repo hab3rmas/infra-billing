@@ -10,7 +10,8 @@ import { EDGE_STYLES, KINDS_BY_PRESET, edgeColor } from '../edgeStyles';
 export function Legend({ preset }: { preset: TopologyPreset }) {
   const { t } = useTranslation();
   const { resolved } = useTheme();
-  const [open, setOpen] = useState(true);
+  // Collapsed on phones: the canvas needs the room.
+  const [open, setOpen] = useState(() => !window.matchMedia('(max-width: 767px)').matches);
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-xs">
       <button

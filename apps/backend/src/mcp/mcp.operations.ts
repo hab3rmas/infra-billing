@@ -1,4 +1,4 @@
-import { API_PATH, ID_PARAM } from '@infra/shared';
+import { API_PATH, FORK_API_PATH, ID_PARAM } from '@infra/shared'; // fork:topology
 
 export type McpAccess = 'read' | 'write' | 'destructive';
 export type McpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -212,5 +212,22 @@ export const MCP_OPERATIONS: McpOperationSpec[] = [
     path: API_PATH.PROJECTS.BY_ID(ID),
     access: 'destructive',
     notes: 'Its services move to the default project.',
+  },
+  // fork:topology (read-only; the fork's write routes stay out of MCP)
+  {
+    name: 'topology.maps',
+    method: 'GET',
+    path: FORK_API_PATH.TOPOLOGY.MAPS,
+    access: 'read',
+    notes: 'Topology maps: name, preset, project, number of nodes.',
+  },
+  {
+    name: 'topology.get',
+    method: 'GET',
+    path: FORK_API_PATH.TOPOLOGY.MAP(ID),
+    access: 'read',
+    notes:
+      'The graph of one map: nodes (role, addresses, billing service summary, ssh target) and ' +
+      'links (kind, label, route, protocol). Hidden nodes and links are included, check `hidden`.',
   },
 ];
