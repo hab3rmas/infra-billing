@@ -1,0 +1,24 @@
+// New services synced from this account land in this project (instead of the default project).
+model AccountDefaultProject {
+  accountUuid String   @id @map("account_uuid")
+  projectUuid String   @map("project_uuid")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  account ProviderAccount @relation(fields: [accountUuid], references: [uuid], onDelete: Cascade)
+  project Project         @relation(fields: [projectUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("account_default_projects")
+}
+
+// One row per service the reconciler has already placed. A service is auto-moved at most once,
+// so if the owner later moves it back by hand, the fork never touches it again.
+model ServiceAutoProject {
+  serviceUuid String   @id @map("service_uuid")
+  projectUuid String   @map("project_uuid")
+  movedAt     DateTime @default(now()) @map("moved_at")
+
+  service Service @relation(fields: [serviceUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("service_auto_projects")
+}

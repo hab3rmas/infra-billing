@@ -1,0 +1,114 @@
+// One topology canvas ("схема"). Usually one per project, but a project may have several
+// (e.g. "VPN prod" and "VPN test") and a map may span projects (projectUuid = null).
+model TopologyMap {
+  uuid        String   @id @default(uuid()) @map("uuid")
+  name        String   @map("name")
+  // Preset that drives the "add node" templates, default link kind and legend:
+  // vpn | web | custom. Any role/kind is still allowed on any map.
+  preset      String   @default("custom") @map("preset")
+  profileUuid String?  @map("profile_uuid") // see section 6.5; null = visible only in "All"
+  projectUuid String?  @map("project_uuid")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project      Project?               @relation(fields: [projectUuid], references: [uuid], onDelete: SetNull)
+  nodes        TopologyNode[]
+  links        TopologyLink[]
+  integrations RemnawaveIntegration[]
+
+  @@index([projectUuid], map: "topology_maps_project_uuid_idx")
+  @@map("topology_maps")
+}
+
+// A box on a map: a billed service, a Remnawave node, an infra server (panel, sub page, bot, DB…),
+// an external endpoint (clients, internet, WARP, RU sites) or a group container.
+// The same service may appear on several maps (one node per map).
+model TopologyNode {
+  uuid        String   @id @default(uuid()) @map("uuid")
+  mapUuid     String   @map("map_uuid")
+  kind        String   @map("kind")            // service | remnawave | external | group
+  // VPN roles: entry | bridge | relay | exit | panel | subscription
+  // web roles: dns | cdn | waf | loadbalancer | web | app | worker | database | db-replica
+  //            | cache | queue | storage | search | mail | backup
+  // common:    bot | monitoring | proxy | bastion | ci | other
+  // externals: client | internet
+  // Stored as a string; the zod enum in shared is the source of truth.
+  role        String   @default("other") @map("role")
+  label       String?  @map("label")           // overrides the service/remnawave name
+  serviceUuid String?  @map("service_uuid")
+  remnawaveNodeUuid String? @map("remnawave_node_uuid") // uuid of the node in Remnawave
+  parentUuid  String?  @map("parent_uuid")     // group container (a server holding several IPs)
+  addresses   Json     @default("[]") @map("addresses") // [{ value, direction: in|out|both, label }]
+  posX        Float?   @map("pos_x")
+  posY        Float?   @map("pos_y")
+  hidden      Boolean  @default(false) @map("hidden")
+  source      String   @default("manual") @map("source") // manual | remnawave
+  meta        Json     @default("{}") @map("meta")
+
+  // SSH / Tabby access. Never a password or a key: only where and as whom to connect.
+  sshHost     String?  @map("ssh_host")
+  sshPort     Int?     @map("ssh_port")
+  sshUser     String?  @map("ssh_user")
+  tabbyProfile String? @map("tabby_profile") // exact Tabby profile name; null → quickConnect
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  map      TopologyMap    @relation(fields: [mapUuid], references: [uuid], onDelete: Cascade)
+  service  Service?       @relation(fields: [serviceUuid], references: [uuid], onDelete: SetNull)
+  parent   TopologyNode?  @relation("TopologyGroup", fields: [parentUuid], references: [uuid], onDelete: SetNull)
+  children TopologyNode[] @relation("TopologyGroup")
+  linksOut TopologyLink[] @relation("LinkFrom")
+  linksIn  TopologyLink[] @relation("LinkTo")
+
+  @@unique([mapUuid, remnawaveNodeUuid], map: "topology_nodes_map_remnawave_node_key")
+  @@index([mapUuid], map: "topology_nodes_map_uuid_idx")
+  @@index([serviceUuid], map: "topology_nodes_service_uuid_idx")
+  @@map("topology_nodes")
+}
+
+model TopologyLink {
+  uuid      String  @id @default(uuid()) @map("uuid")
+  mapUuid   String  @map("map_uuid")
+  fromUuid  String  @map("from_uuid")
+  toUuid    String  @map("to_uuid")
+  // VPN traffic: entry | bridge | chain | exit | direct | warp
+  // web traffic: http (user/CDN/LB → app) | grpc | dns
+  // data:        db (app → database) | replication | cache | queue | storage | backup
+  // infra:       panel (panel manages a node) | subscription | api | depends | ssh | custom
+  kind      String  @default("chain") @map("kind")
+  label     String? @map("label")      // free text, e.g. "PL-OUT"
+  route     Int?    @map("route")      // vlessRoute number, shown as "маршрут N"
+  protocol  String? @map("protocol")   // vless-reality, xhttp, wireguard…
+  animated  Boolean @default(true) @map("animated")
+  hidden    Boolean @default(false) @map("hidden")
+  source    String  @default("manual") @map("source") // manual | remnawave
+  sourceKey String? @map("source_key") // stable key from the importer, for idempotent upserts
+  meta      Json    @default("{}") @map("meta")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  map  TopologyMap  @relation(fields: [mapUuid], references: [uuid], onDelete: Cascade)
+  from TopologyNode @relation("LinkFrom", fields: [fromUuid], references: [uuid], onDelete: Cascade)
+  to   TopologyNode @relation("LinkTo", fields: [toUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([mapUuid, sourceKey], map: "topology_links_map_source_key_key")
+  @@index([fromUuid], map: "topology_links_from_uuid_idx")
+  @@index([toUuid], map: "topology_links_to_uuid_idx")
+  @@map("topology_links")
+}
+
+// Singleton (id = 1): Tabby / canvas defaults.
+model TopologySettings {
+  id              Int     @id @default(1) @map("id")
+  defaultSshUser  String  @default("root") @map("default_ssh_user")
+  defaultSshPort  Int     @default(22) @map("default_ssh_port")
+  tabbyEnabled    Boolean @default(true) @map("tabby_enabled")
+  animateEdges    Boolean @default(true) @map("animate_edges")
+  showExternal    Boolean @default(true) @map("show_external")
+  layoutDirection String  @default("RIGHT") @map("layout_direction") // RIGHT | DOWN
+
+  @@map("topology_settings")
+}

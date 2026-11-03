@@ -10,6 +10,8 @@ model Project {
   updatedAt DateTime @updatedAt      @map("updated_at")
 
   services Service[]
+  topologyMaps    TopologyMap[]           // fork:topology
+  accountDefaults AccountDefaultProject[] // fork:topology
 
   @@map("projects")
 }

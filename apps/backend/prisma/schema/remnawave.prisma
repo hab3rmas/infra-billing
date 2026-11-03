@@ -1,0 +1,26 @@
+// A connection to one Remnawave panel (the owner may run several). Imports into one map.
+// Token and extra headers are AES-GCM encrypted.
+model RemnawaveIntegration {
+  uuid             String    @id @default(uuid()) @map("uuid")
+  name             String    @map("name")             // "VPN основной"
+  mapUuid          String    @map("map_uuid")         // target map
+  enabled          Boolean   @default(true) @map("enabled")
+  baseUrl          String    @map("base_url")
+  tokenEnc         Bytes?    @map("token_enc")
+  extraHeadersEnc  Bytes?    @map("extra_headers_enc") // JSON {name: value}, e.g. a reverse-proxy cookie/secret
+  // Optional public URL of the subscription page (remnawave/subscription-page), shown as its own node.
+  subscriptionUrl  String?   @map("subscription_url")
+  // Service rows of the panel / sub page servers in billing, to put cost and Tabby on those nodes.
+  panelServiceUuid String?   @map("panel_service_uuid")
+  subServiceUuid   String?   @map("sub_service_uuid")
+  autoSync         Boolean   @default(true) @map("auto_sync") // piggyback on the provider sync interval
+  lastSyncAt       DateTime? @map("last_sync_at")
+  lastSyncError    String?   @map("last_sync_error")
+  lastSnapshot     Json?     @map("last_snapshot") // trimmed raw response for debugging (no secrets)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  map TopologyMap @relation(fields: [mapUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("remnawave_integrations")
+}

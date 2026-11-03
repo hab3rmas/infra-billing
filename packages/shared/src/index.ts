@@ -16,3 +16,6 @@ export * from './schemas/auth';
 export * from './schemas/webauthn';
 export * from './schemas/health';
 export * from './schemas/api-token';
+// fork:topology
+export * from './fork-routes';
+export * from './schemas/topology';

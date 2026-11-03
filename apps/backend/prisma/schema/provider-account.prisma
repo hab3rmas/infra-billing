@@ -24,6 +24,7 @@ model ProviderAccount {
   payments  Payment[]
   snapshots BalanceSnapshot[]
   syncRuns  SyncRun[]
+  defaultProject AccountDefaultProject? // fork:topology
 
   // Target of the (account_uuid, provider_uuid) foreign keys on services and payments: moving an
   // account to another provider (merge) cascades the denormalized provider_uuid along with it.
