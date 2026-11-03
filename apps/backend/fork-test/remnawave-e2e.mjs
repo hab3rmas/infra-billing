@@ -10,11 +10,13 @@ import { snapshot } from './remnawave-fixtures.mjs';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8080';
 const TOKEN = 'rw-secret-token-123';
 let cookie = '';
+// WITH_PROFILE=1 runs the whole flow inside a profile (X-Profile), like the UI does.
+let profileHeader = {};
 
 async function call(method, path, body, expected) {
   const res = await fetch(`${BASE}/api${path}`, {
     method,
-    headers: { 'content-type': 'application/json', cookie },
+    headers: { 'content-type': 'application/json', cookie, ...profileHeader },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const set = res.headers.getSetCookie?.() ?? [];
@@ -80,6 +82,11 @@ await call('POST', '/auth/login', {
   password: process.env.PASSWORD ?? 'password123',
 });
 const step = (n) => console.log(`- ${n}`);
+if (process.env.WITH_PROFILE === '1') {
+  const prof = await call('POST', '/profiles', { name: `RW profile ${Date.now()}` });
+  profileHeader = { 'X-Profile': prof.uuid };
+  console.log('running inside a profile');
+}
 const graph = (map) => call('GET', `/topology/maps/${map}`);
 const byLabel = (g, label) => g.nodes.find((n) => n.label === label);
 

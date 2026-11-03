@@ -206,6 +206,48 @@ assert.deepEqual(
 const svcsA = await call('GET', '/services', { profile: A.uuid });
 assert.deepEqual(svcsA.map((s) => s.uuid).sort(), [sA.uuid, sSharedA.uuid].sort());
 
+step('changing your OWN records inside the profile works (regression: update/delete guard)');
+await call(
+  'PATCH',
+  `/services/${sA.uuid}`,
+  { body: { name: `renamed-${RUN}` }, profile: A.uuid },
+  200,
+);
+await call(
+  'PATCH',
+  `/projects/${pa.uuid}`,
+  { body: { name: `VPN-renamed-${RUN}` }, profile: A.uuid },
+  200,
+);
+await call(
+  'PATCH',
+  `/topology/maps/${mapA.uuid}`,
+  { body: { name: `map-a2-${RUN}` }, profile: A.uuid },
+  200,
+);
+const nodeA = await call('POST', '/topology/nodes', {
+  body: { mapUuid: mapA.uuid, kind: 'external', role: 'client', label: 'x' },
+  profile: A.uuid,
+});
+await call(
+  'PATCH',
+  `/topology/nodes/${nodeA.uuid}`,
+  { body: { label: 'y' }, profile: A.uuid },
+  200,
+);
+await call('DELETE', `/topology/nodes/${nodeA.uuid}`, { profile: A.uuid }, 204);
+const tmpPay = await call('POST', '/payments', {
+  body: {
+    accountUuid: provA.account.uuid,
+    serviceUuid: sA.uuid,
+    amount: '1.00',
+    currency: 'USD',
+    paymentDate: new Date().toISOString(),
+  },
+  profile: A.uuid,
+});
+await call('DELETE', `/payments/${tmpPay.uuid}`, { profile: A.uuid }, 204);
+
 step('a foreign uuid is a 404 for read, update and delete');
 await call('PATCH', `/services/${sB.uuid}`, { body: { name: 'x' }, profile: A.uuid }, 404);
 await call('DELETE', `/services/${sB.uuid}`, { profile: A.uuid }, 404);

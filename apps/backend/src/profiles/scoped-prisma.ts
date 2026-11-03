@@ -126,8 +126,9 @@ export function createScopedPrisma<T extends PrismaClient>(base: T): T {
           if (extra && WHERE_OPS.has(operation)) {
             const where = and(args.where as Where | undefined, extra);
             if (GUARDED_OPS.has(operation)) {
-              // A foreign record must look absent, not raise Prisma's P2025 (a 500).
-              const found = await delegate.findFirst({ where, select: {} as Row });
+              // A foreign record must look absent, not raise Prisma's P2025 (a 500). Every scoped model
+              // has a `uuid` key; an empty `select` would be rejected by Prisma.
+              const found = await delegate.findFirst({ where, select: { uuid: true } as Row });
               if (!found) throw new NotFoundException(`${model} not found`);
             }
             args = { ...args, where };
