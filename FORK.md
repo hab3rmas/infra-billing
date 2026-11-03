@@ -252,12 +252,12 @@ After every merge also run: the unit tests (`node --test apps/backend/fork-test/
   checked-out `docker-entrypoint.sh` has CRLF line endings and the container dies with
   `set: illegal option -`. This is a checkout artifact, the blob in git is LF:
   `git -c core.autocrlf=false archive HEAD | tar -x -C <dir>` then `docker build <dir>`.
-- Verified: the fork image builds (`docker build`, exit 0). Migrations were applied with
-  `prisma migrate deploy` (the same command the entrypoint runs) on an empty database and on a
-  database already filled with upstream data, and the panel then served requests (stages 1 and 1.5).
-- NOT verified in a container: starting the fork image against an empty database and against a
-  database created by the upstream image. The attempt was interrupted when Docker Desktop stopped
-  responding on the author's machine. Repeat once: build both images from clean exports (see above),
-  start the upstream one against a fresh database, create a couple of services, stop it, start the
-  fork image on the same database and check that the logs say "Migrations applied." and that the
-  services are still there.
+- Verified in containers (images built from clean `git archive` exports, upstream 0.54.0 and the fork):
+  1. the fork image on an EMPTY database: all 30 migrations apply, "Migrations applied.", health is ok;
+  2. the upstream image on a fresh database, an owner and two services created, then the fork image on
+     the SAME database: the three fork migrations apply (`fork_topology_init`,
+     `fork_remnawave_integration`, `fork_profiles`), both services are still there, and a topology
+     map, a profile and a profile-scoped request work.
+- To repeat after merging upstream: build both images from exports, start the upstream one on a fresh
+  database, create a couple of services, stop it, start the fork on the same database and check the
+  log says "Migrations applied." and the services are still there.
