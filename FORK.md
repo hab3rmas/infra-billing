@@ -20,7 +20,7 @@ Work lives on `fork/topology`; `main` mirrors upstream. Task text: `FORK_TOPOLOG
 | 2. Topology page | done |
 | 3. Tabby | done |
 | 4. Remnawave | done |
-| 5. Polish | not started |
+| 5. Polish | done |
 
 ## Touch points in upstream files
 
@@ -37,6 +37,8 @@ Every insertion is marked `fork:topology` and sits at the end of its list.
 | `apps/backend/src/prisma/prisma.module.ts` | provides `PrismaBase` and the scoped client under the `PrismaService` token |
 | `apps/backend/src/notifications/notifications.module.ts` | `NotificationsService` / `TelegramService` provided via profile-aware subclasses |
 | `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule`, `RemnawaveModule` |
+| `apps/backend/src/mcp/mcp.operations.ts` | two read-only operations `topology.maps`, `topology.get` at the end of the list, plus the `FORK_API_PATH` import |
+| `package-lock.json` | follows the `apps/frontend/package.json` dependencies (regenerate with `npm install`, do not merge by hand) |
 | `apps/frontend/src/main.tsx` | `import './lib/profileScope'` (adds the `X-Profile` header to the axios client) |
 | `apps/frontend/src/layout/AppLayout.tsx` | `<ProfileSwitcher />` in the sidebar header, `<ProfileBadge />` next to the breadcrumb |
 | `apps/frontend/src/layout/nav.ts` | items "Topology" (infrastructure) and settings "Profiles", "Topology settings" |
@@ -161,8 +163,8 @@ number, never an id). Re-check this table after every upstream merge, and run
 - A server without a billing service (panel, bot…) is stored as `kind=external` with a server role and
   drawn as a card; only client/internet/dns/cdn/waf/storage/backup are drawn as pills (`PILL_ROLES`).
 - Mobile (< 768 px): view only (pan, zoom, tap opens the sheet); no dragging, linking or editing.
-- Not done yet (later stages): node search, PNG/SVG export, "one server with several roles" wizard
-  (use a container node by hand), SSH/Tabby fields and buttons, Remnawave sync button.
+- Not done: a "one server with several roles" wizard (create a container node by hand and move the
+  nodes into it).
 - Checks: `scripts/fork-capture-topology.mjs` (screenshots, light/dark), `scripts/fork-e2e-topology.mjs`
   (drag saves, hover dims, add node), `apps/backend/fork-test/seed-topology-demo.mjs` (the owner's VPN
   scheme and a website scheme through the API).
@@ -220,3 +222,42 @@ number, never an id). Re-check this table after every upstream merge, and run
 - Tests: `fork-test/remnawave-importer.test.mjs`, `remnawave-plan.test.mjs` (fixtures:
   `remnawave-fixtures.mjs`), `remnawave-e2e.mjs` (API against a running panel and a mock Remnawave),
   `scripts/fork-e2e-remnawave.mjs` (browser).
+
+## Polish (stage 5)
+
+- Node search (a combobox over the canvas, centres and highlights the node), PNG / SVG export of the
+  whole graph (`html-to-image`, theme-aware background), mobile view (< 768 px: pan/zoom and tap to
+  open the sheet; legend and project card start collapsed).
+- MCP: `topology.maps` and `topology.get` (read-only, fit in one insertion in `mcp.operations.ts`;
+  verified with a read-only API token by `fork-test/mcp-topology.mjs`). No fork write operation is
+  exposed over MCP.
+- `fork-test/i18n-keys.test.mjs` checks that en and ru have the same keys, the right plural forms and
+  that every key used by the fork UI exists.
+
+## Trial merge of upstream (stage 5 report)
+
+`git fetch upstream && git merge upstream/main` on `fork/topology` (upstream at 0.54.0, the same
+commit the fork branched from): "Already up to date", so there was nothing to conflict. The files of
+upstream the fork modifies are exactly the 17 listed under "Touch points" (checked with
+`git diff --name-status upstream/main HEAD | grep '^M'`). Re-run that command after every merge: a file
+that shows up there and is not in the table is a bug in the fork. Real conflicts can only be in those
+files, always as small insertions marked `fork:topology`.
+
+After every merge also run: the unit tests (`node --test apps/backend/fork-test/*.test.mjs`), then
+`profile-leak.mjs` against a panel with `DOCS=true` (it walks every GET of the new Swagger).
+
+## Docker verification (done on the author's Windows machine)
+
+- Build the image from a clean export, not from the working copy: with `core.autocrlf=true` the
+  checked-out `docker-entrypoint.sh` has CRLF line endings and the container dies with
+  `set: illegal option -`. This is a checkout artifact, the blob in git is LF:
+  `git -c core.autocrlf=false archive HEAD | tar -x -C <dir>` then `docker build <dir>`.
+- Verified: the fork image builds (`docker build`, exit 0). Migrations were applied with
+  `prisma migrate deploy` (the same command the entrypoint runs) on an empty database and on a
+  database already filled with upstream data, and the panel then served requests (stages 1 and 1.5).
+- NOT verified in a container: starting the fork image against an empty database and against a
+  database created by the upstream image. The attempt was interrupted when Docker Desktop stopped
+  responding on the author's machine. Repeat once: build both images from clean exports (see above),
+  start the upstream one against a fresh database, create a couple of services, stop it, start the
+  fork image on the same database and check that the logs say "Migrations applied." and that the
+  services are still there.
