@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/client';
+import { useServices } from '@/api/services';
 import { useDeleteNode, useUpdateNode } from '@/api/topology';
 import { Combobox } from '@/components/Combobox';
 import { TabbyLinkButton } from '@/components/fork/OpenInTabbyButton';
@@ -23,6 +24,7 @@ import {
 import { formatMoney } from '@/utils/format';
 import { notifyError, notifySuccess } from '@/utils/notify';
 import { EDGE_STYLES } from '../edgeStyles';
+import { nodeCountry } from '../graph';
 import { ROLES } from '../roles';
 
 interface Props {
@@ -42,10 +44,12 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
   const node = graph.nodes.find((n) => n.uuid === nodeUuid) ?? null;
   const mapUuid = graph.map.uuid;
   const update = useUpdateNode(mapUuid);
+  const { data: services } = useServices({});
   const del = useDeleteNode(mapUuid);
   const [label, setLabel] = useState('');
   const [role, setRole] = useState<TopologyNodeRole>('other');
   const [parentUuid, setParentUuid] = useState('');
+  const [serviceUuid, setServiceUuid] = useState('');
   const [addresses, setAddresses] = useState<Addr[]>([]);
   const [sshHost, setSshHost] = useState('');
   const [sshPort, setSshPort] = useState('');
@@ -57,12 +61,34 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
     setLabel(node.label ?? '');
     setRole(node.role);
     setParentUuid(node.parentUuid ?? '');
+    setServiceUuid(node.serviceUuid ?? '');
     setAddresses(node.addresses);
     setSshHost(node.sshHost ?? '');
     setSshPort(node.sshPort?.toString() ?? '');
     setSshUser(node.sshUser ?? '');
     setTabbyProfile(node.tabbyProfile ?? '');
   }, [node]);
+
+  // Services of the map's project first, then the rest; ones in the node's country on top, and
+  // the ones already on another node of this map are marked, so a free server is easy to spot.
+  const taken = new Set(
+    graph.nodes.filter((n) => n.uuid !== nodeUuid && n.serviceUuid).map((n) => n.serviceUuid),
+  );
+  const country = node ? nodeCountry(node) : null;
+  const serviceOptions = (services ?? [])
+    .map((s) => ({
+      value: s.uuid,
+      label: s.name,
+      group:
+        s.projectUuid === graph.map.projectUuid
+          ? t('topology.thisProject')
+          : t('topology.otherProjects'),
+      hint: taken.has(s.uuid) ? t('topology.onMapAlready') : (s.countryCode ?? undefined),
+      keywords: [s.type, s.countryCode ?? ''],
+      rank: (s.countryCode && s.countryCode === country ? 0 : 1) + (taken.has(s.uuid) ? 2 : 0),
+    }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ rank: _rank, ...o }) => o);
 
   if (!node) return <Sheet open={false} />;
   const svc = node.service;
@@ -99,6 +125,7 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
           label: label.trim() || null,
           role,
           parentUuid: parentUuid || null,
+          serviceUuid: serviceUuid || null,
           addresses: addresses.filter((a) => a.value.trim()),
           sshHost: sshHost.trim() || null,
           sshPort: port,
@@ -172,6 +199,17 @@ export function NodeSheet({ graph, nodeUuid, onClose, onSelectNode, editable }: 
               onChange={(e) => setLabel(e.target.value)}
               disabled={!editable}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('topology.billingService')}</Label>
+            <Combobox
+              value={serviceUuid}
+              onChange={setServiceUuid}
+              disabled={!editable}
+              placeholder={t('topology.noService')}
+              options={[{ value: '', label: t('topology.noService') }, ...serviceOptions]}
+            />
+            <p className="text-xs text-ink-2">{t('topology.serviceLinkHint')}</p>
           </div>
           <div className="space-y-2">
             <Label>{t('topology.role.title')}</Label>

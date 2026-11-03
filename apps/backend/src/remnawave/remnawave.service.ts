@@ -256,7 +256,10 @@ export class RemnawaveService implements OnModuleInit {
       if (!n.remnawaveNodeUuid) continue;
       const address =
         typeof n.meta.address === 'string' ? n.meta.address : (n.addresses[0]?.value ?? '');
-      const ips = await resolveIps(address);
+      // Every IP the node is known by: its address (through DNS when a domain) plus the IPs
+      // found in its xray config (inbound listen, sendThrough). The config ones are exact, DNS
+      // can lie (proxied domains, fake-IP resolvers).
+      const ips = [...n.addresses.map((a) => a.value), ...(await resolveIps(address))];
       const name = n.label.replace(/ · IP A$/, '');
       const r = matchService({ name, ips }, services, projectUuid);
       if (r && 'uuid' in r) out.set(n.key, r.uuid);

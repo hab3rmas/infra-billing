@@ -6,7 +6,7 @@ import { INT, MADKID, snapshot } from './remnawave-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const { buildTopologyFromRemnawave } = require('../dist/remnawave/remnawave.importer.js');
 const { planImport } = require('../dist/remnawave/remnawave.plan.js');
-const { matchService } = require('../dist/remnawave/remnawave.match.js');
+const { matchService, isUsableIp } = require('../dist/remnawave/remnawave.match.js');
 const { checkPanelUrl, isLocalOrPrivateHost } = require('../dist/remnawave/remnawave.url.js');
 const {
   parseNodes,
@@ -287,4 +287,38 @@ test('parsers accept wrapped and bare payloads and skip junk without throwing', 
     2,
   );
   assert.deepEqual(parseHosts('garbage', warn), []);
+});
+
+test('IPs from the node config match a service even when DNS is useless (fake-IP resolver)', () => {
+  const svcs = [{ uuid: 'pl', name: 'ds-3fe48a', projectUuid: 'p1', ips: ['179.253.101.6'] }];
+  // The domain resolves to 198.18.x.x (Clash / sing-box fake IP); the inbound listens on the real IP.
+  const r = matchService(
+    { name: 'Poland', ips: ['198.18.4.34', '127.0.0.1', 'api-pl.zxcnub.xyz', '179.253.101.6'] },
+    svcs,
+    'p1',
+  );
+  assert.deepEqual(r, { uuid: 'pl' });
+  // Only the fake IP: no (wrong) match.
+  assert.equal(matchService({ name: 'x', ips: ['198.18.4.34'] }, svcs, 'p1'), null);
+});
+
+test('usable IPs are public IPv4 only', () => {
+  for (const ip of ['179.253.101.6', '65.109.181.209', '8.8.8.8'])
+    assert.equal(isUsableIp(ip), true, ip);
+  for (const ip of [
+    '198.18.4.34',
+    '198.19.0.1',
+    '127.0.0.1',
+    '10.1.2.3',
+    '192.168.0.5',
+    '172.20.0.1',
+    '169.254.1.1',
+    '100.64.0.1',
+    '0.0.0.0',
+    '999.1.1.1',
+    'example.com',
+    '::1',
+    '',
+  ])
+    assert.equal(isUsableIp(ip), false, ip);
 });

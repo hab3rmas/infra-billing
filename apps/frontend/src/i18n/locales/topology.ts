@@ -43,6 +43,11 @@ export const topology = {
     groupNode: 'Container for several nodes (one server, several IPs)',
     billingService: 'Billing service',
     noService: 'No service',
+    serviceLinkHint:
+      'Links this node to a billing server: its cost, provider and country show on the card. A link set here is never overwritten by the Remnawave sync.',
+    thisProject: 'Project of this map',
+    otherProjects: 'Other projects',
+    onMapAlready: 'already on the map',
     allProjects: 'Services of all projects',
     label: 'Label',
     address: 'Address',
@@ -197,6 +202,11 @@ export const topology = {
     groupNode: 'Контейнер для нескольких узлов (один сервер, несколько IP)',
     billingService: 'Сервис из биллинга',
     noService: 'Без сервиса',
+    serviceLinkHint:
+      'Привязывает узел к серверу из биллинга: на карточке появятся стоимость, провайдер и страна. Привязку, заданную здесь, синк Remnawave не перезапишет.',
+    thisProject: 'Проект этой схемы',
+    otherProjects: 'Другие проекты',
+    onMapAlready: 'уже на схеме',
     allProjects: 'Сервисы всех проектов',
     label: 'Подпись',
     address: 'Адрес',
