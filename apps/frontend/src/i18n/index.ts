@@ -6,6 +6,7 @@ import { common } from './locales/common';
 import { dashboard } from './locales/dashboard';
 import { payments } from './locales/payments';
 import { profiles } from './locales/profiles'; // fork:topology
+import { topology, topologySettings } from './locales/topology'; // fork:topology
 import { projects } from './locales/projects';
 import { providers } from './locales/providers';
 import { services } from './locales/services';
@@ -29,6 +30,8 @@ const resources = {
       auth: auth.en,
       tokens: tokens.en,
       profiles: profiles.en, // fork:topology
+      topology: topology.en, // fork:topology
+      topologySettings: topologySettings.en, // fork:topology
       timezones: timezones.en,
     },
   },
@@ -44,6 +47,8 @@ const resources = {
       auth: auth.ru,
       tokens: tokens.ru,
       profiles: profiles.ru, // fork:topology
+      topology: topology.ru, // fork:topology
+      topologySettings: topologySettings.ru, // fork:topology
       timezones: timezones.ru,
     },
   },

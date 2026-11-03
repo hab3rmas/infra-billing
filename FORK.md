@@ -17,7 +17,7 @@ Work lives on `fork/topology`; `main` mirrors upstream. Task text: `FORK_TOPOLOG
 |---|---|
 | 1. Skeleton and data (models, migrations, topology + account-projects modules) | done |
 | 1.5. Profiles | done |
-| 2. Topology page | not started |
+| 2. Topology page | done |
 | 3. Tabby | not started |
 | 4. Remnawave | not started |
 | 5. Polish | not started |
@@ -39,16 +39,16 @@ Every insertion is marked `fork:topology` and sits at the end of its list.
 | `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule` |
 | `apps/frontend/src/main.tsx` | `import './lib/profileScope'` (adds the `X-Profile` header to the axios client) |
 | `apps/frontend/src/layout/AppLayout.tsx` | `<ProfileSwitcher />` in the sidebar header, `<ProfileBadge />` next to the breadcrumb |
-| `apps/frontend/src/layout/nav.ts` | settings item "Profiles" |
-| `apps/frontend/src/App.tsx` | route `settings/profiles` |
-| `apps/frontend/src/i18n/index.ts` | `profiles` namespace (en, ru) |
+| `apps/frontend/src/layout/nav.ts` | items "Topology" (infrastructure) and settings "Profiles", "Topology settings" |
+| `apps/frontend/src/App.tsx` | routes `settings/profiles`, `settings/topology`, lazy `topology` |
+| `apps/frontend/src/i18n/index.ts` | `profiles`, `topology`, `topologySettings` namespaces (en, ru) |
+| `apps/frontend/package.json` | `@xyflow/react`, `elkjs` (the lockfile changes with it) |
 
 Not touched (kept in fork files instead): `routes.ts` (see `fork-routes.ts`),
 `controllers-info.ts` (see `FORK_CONTROLLERS_INFO` in `fork-routes.ts`), the global
 `RepositoriesModule` (fork repositories are provided by the fork's own modules).
 
-Planned touch points (later stages): `ServicesTable.tsx`, `ServiceDetailModal.tsx`,
-`frontend/package.json`, and the topology route / nav item.
+Planned touch points (later stages): `ServicesTable.tsx`, `ServiceDetailModal.tsx`.
 
 ## New files
 
@@ -147,3 +147,21 @@ Switcher at the top of the sidebar; `All profiles` is exactly upstream's behavio
 Known limitation: `_count` values on a shared account/provider include the other profile's rows (a
 number, never an id). Re-check this table after every upstream merge, and run
 `apps/backend/fork-test/profile-leak.mjs` (it walks every Swagger GET, so new endpoints are covered).
+
+## Topology page (stage 2)
+
+- Files: `pages/topology/` (canvas, nodes, edge, panels, `roles.ts`, `edgeStyles.ts`, `graph.ts`,
+  `layout.ts`, `topology.css`), `pages/settings-topology/`, `api/topology.ts`, `i18n/locales/topology.ts`.
+- React Flow 12 for the canvas, elk (`layered`, lazy `import()`) for the automatic layout; both load
+  only with the lazy topology route. Edge dots are SVG `<animateMotion>` (no animation library); off
+  per link, globally (`TopologySettings.animateEdges`) and for `prefers-reduced-motion`.
+- Layout: nodes without saved coordinates get an elk layout once and it is saved; manual positions
+  always win. Children of a group are stacked inside it (positions relative to the group).
+- A server without a billing service (panel, bot…) is stored as `kind=external` with a server role and
+  drawn as a card; only client/internet/dns/cdn/waf/storage/backup are drawn as pills (`PILL_ROLES`).
+- Mobile (< 768 px): view only (pan, zoom, tap opens the sheet); no dragging, linking or editing.
+- Not done yet (later stages): node search, PNG/SVG export, "one server with several roles" wizard
+  (use a container node by hand), SSH/Tabby fields and buttons, Remnawave sync button.
+- Checks: `scripts/fork-capture-topology.mjs` (screenshots, light/dark), `scripts/fork-e2e-topology.mjs`
+  (drag saves, hover dims, add node), `apps/backend/fork-test/seed-topology-demo.mjs` (the owner's VPN
+  scheme and a website scheme through the API).

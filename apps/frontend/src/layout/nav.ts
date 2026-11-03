@@ -6,6 +6,7 @@ import {
   IconLayoutDashboard,
   IconReceipt2,
   IconServer2,
+  IconSitemap,
   IconSettings,
   IconShieldLock,
   IconStack2,
@@ -31,6 +32,7 @@ export const NAV: { sectionKey: string; items: NavItem[] }[] = [
       { to: '/projects', labelKey: 'nav.projects', icon: IconFolders },
       { to: '/services', labelKey: 'nav.services', icon: IconStack2 },
       { to: '/payments', labelKey: 'nav.payments', icon: IconReceipt2 },
+      { to: '/topology', labelKey: 'topology.navItem', icon: IconSitemap }, // fork:topology
     ],
   },
   {
@@ -40,6 +42,7 @@ export const NAV: { sectionKey: string; items: NavItem[] }[] = [
       { to: '/settings/auth', labelKey: 'nav.authItem', icon: IconShieldLock },
       { to: '/settings/tokens', labelKey: 'nav.tokensItem', icon: IconKey },
       { to: '/settings/profiles', labelKey: 'profiles.navItem', icon: IconLayersSubtract }, // fork:topology
+      { to: '/settings/topology', labelKey: 'topologySettings.title', icon: IconSitemap }, // fork:topology
     ],
   },
 ];

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import 'dayjs/locale/ru';
@@ -20,6 +21,12 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { AuthSettingsPage } from './pages/auth-settings/AuthSettingsPage';
 import { TokensPage } from './pages/TokensPage';
 import { ProfilesSettingsPage } from './pages/settings-profiles/ProfilesSettingsPage'; // fork:topology
+import { TopologySettingsPage } from './pages/settings-topology/TopologySettingsPage'; // fork:topology
+
+// fork:topology: lazy, so React Flow stays out of the main bundle.
+const TopologyPage = lazy(() =>
+  import('./pages/topology/TopologyPage').then((m) => ({ default: m.TopologyPage })),
+);
 
 // Relative dates ("3 days ago") for the build badge; the locale is switched per render below.
 dayjs.extend(relativeTime);
@@ -53,6 +60,15 @@ export default function App() {
                   <Route path="settings/tokens" element={<TokensPage />} />
                   {/* fork:topology */}
                   <Route path="settings/profiles" element={<ProfilesSettingsPage />} />
+                  <Route path="settings/topology" element={<TopologySettingsPage />} />
+                  <Route
+                    path="topology"
+                    element={
+                      <Suspense fallback={null}>
+                        <TopologyPage />
+                      </Suspense>
+                    }
+                  />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
