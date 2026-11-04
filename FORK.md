@@ -36,9 +36,9 @@ Every insertion is marked `fork:topology` and sits at the end of its list.
 | `apps/backend/prisma/schema/project.prisma` | (also) back-relation `profileProject` |
 | `apps/backend/src/prisma/prisma.module.ts` | provides `PrismaBase` and the scoped client under the `PrismaService` token |
 | `apps/backend/src/notifications/notifications.module.ts` | `NotificationsService` / `TelegramService` provided via profile-aware subclasses |
-| `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule`, `RemnawaveModule` |
+| `apps/backend/src/app.module.ts` | (also) `ProfilesCoreModule`, `ProfilesModule`, `RemnawaveModule`, `SecurityModule` |
 | `apps/backend/src/mcp/mcp.operations.ts` | two read-only operations `topology.maps`, `topology.get` at the end of the list, plus the `FORK_API_PATH` import |
-| `package-lock.json` | follows the `apps/frontend/package.json` dependencies (regenerate with `npm install`, do not merge by hand) |
+| `package-lock.json` | follows the frontend dependencies and the `npm audit fix` run (regenerate with `npm install`, do not merge by hand) |
 | `apps/frontend/src/main.tsx` | `import './lib/profileScope'` (adds the `X-Profile` header to the axios client) |
 | `apps/frontend/src/layout/AppLayout.tsx` | `<ProfileSwitcher />` in the sidebar header, `<ProfileBadge />` next to the breadcrumb |
 | `apps/frontend/src/layout/nav.ts` | items "Topology" (infrastructure) and settings "Profiles", "Topology settings" |
@@ -297,3 +297,35 @@ Added after the first real use; nothing in upstream files changed for it.
 - Not done: undo (Ctrl+Z), reconnecting a link end by dragging, Telegram alerts for topology events
   (not wanted), per-token profile binding.
 - Tests: `fork-test/stage6-api.mjs`, `scripts/fork-e2e-review.mjs`, updated `fork-e2e-mobile.mjs`.
+
+## Production hardening and deployment (stage 7)
+
+Everything is in `deploy/` (new files) plus `src/security/` and one registration line in `app.module.ts`.
+The step-by-step guide in Russian is `deploy/DEPLOY.md`.
+
+- **Sign-in throttle** (`src/security/`, upstream has none): 8 rejected attempts per client address or
+  20 per username in 15 minutes block the key for 15 minutes, every further block doubles (cap 6 h);
+  wrong `Bearer` tokens are counted too; a correct sign-in is never counted. X-Forwarded-For is trusted
+  only from a private peer (the proxy). `FORK_LOGIN_THROTTLE=false` turns it off. Tests:
+  `fork-test/security.test.mjs`, `security-smoke.mjs` (live).
+- **SSRF guard for Remnawave:** the address is vetted at connect time (link-local/cloud metadata and the
+  unspecified address always refused, loopback refused for names), `http://` only for localhost and
+  private ranges (not 169.254/16).
+- **Settings row created at startup** (`fork-bootstrap.service.ts`): upstream's lazy upsert raced on a
+  fresh install's first page load (a 500 in the log).
+- **npm audit fix** applied (lockfile only): the critical/high findings in reachable code are gone. What
+  remains (`@nestjs/swagger` pinned by upstream, `multer`, `zod`, `nestjs-zod`) is unreachable from the
+  network or needs a breaking Nest/Zod upgrade; see the residual-risk list in `deploy/DEPLOY.md`.
+- **Stack** (`deploy/docker-compose.yml`): Caddy (TLS, HSTS, CSP, request cap) -> panel -> Postgres; only
+  Caddy publishes ports; the database is on an `internal` network; every container is read-only with
+  `cap_drop: ALL` and `no-new-privileges`; the panel runs as uid 1000. Optional second password
+  (`caddy/extra/basic-auth.caddy`) and IP allow-list.
+- **CSP** is verified in a real browser on every page and on the PNG export
+  (`scripts/fork-e2e-prod.mjs`). It allows one inline script by sha256 (the theme script of
+  `index.html`; `fork-test/deploy-config.test.mjs` fails when upstream changes it, fix with
+  `deploy/csp-hash.sh`) and one font URL on jsDelivr; the GitHub API calls of the sidebar are blocked.
+- **Verified:** the whole stack on a fresh machine-local run (non-root, read-only, no capabilities, DB
+  unpublished and on an internal network, headers, HTTP->HTTPS, docs 404, CSP clean, throttle through the
+  proxy, second-password gate incl. the setup page, backup then restore then sign-in with the restored
+  data). Not verified here: real Let's Encrypt issuance (needs the public DNS record), a Linux host.
+- Touch points: none new except the `SecurityModule` line above.
