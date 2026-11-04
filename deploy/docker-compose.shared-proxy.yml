@@ -1,0 +1,14 @@
+# For a server where something else (a Caddy / nginx on the host) already owns ports 80 and 443.
+# Our own Caddy is switched off and the panel listens on 127.0.0.1:8081 for that proxy to forward to.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.shared-proxy.yml up -d
+#
+# The host proxy then needs the site block from caddy/host-caddy.snippet.example (TLS, headers, CSP).
+# The panel is never published on a public address: only loopback.
+
+services:
+  caddy:
+    profiles: [own-proxy] # not started unless asked for by name
+  infra-billing:
+    ports:
+      - '127.0.0.1:8081:8080'

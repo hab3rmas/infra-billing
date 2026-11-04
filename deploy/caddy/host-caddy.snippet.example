@@ -1,0 +1,40 @@
+# Site block for a Caddy that already runs on the host (port 80/443 owned by it).
+# Put it into /etc/caddy/Caddyfile next to your other sites, then: caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+# The panel itself must be started with docker-compose.shared-proxy.yml (listens on 127.0.0.1:8081).
+# Keep the CSP hash in sync with deploy/Caddyfile (deploy/csp-hash.sh).
+
+xkrvx5jhbw.drksha.com {
+	# Second password in front of the panel (generate: caddy hash-password). Remove after you have
+	# created the owner account and added a passkey, or keep it: it is a good extra layer.
+	# API clients with a Bearer token skip it: the panel checks the token itself.
+	@gated not expression `{http.request.header.Authorization}.startsWith('Bearer ') && {http.request.uri.path}.startsWith('/api/') && !{http.request.uri.path}.startsWith('/api/auth/')`
+	basic_auth @gated {
+		owner PASTE_THE_BCRYPT_HASH_HERE
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), publickey-credentials-get=(self), publickey-credentials-create=(self)"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-4+wbd1NsCtfMwja6qYO65PZY38T5xpxa5vD8eLK6ShE='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1/dist/TwemojiCountryFlags.woff2; connect-src 'self' https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1/dist/TwemojiCountryFlags.woff2; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+		-Server
+		-X-Powered-By
+	}
+
+	request_body {
+		max_size 2MB
+	}
+
+	@docs path /api/docs /api/docs/* /api/docs-json /api/docs-yaml
+	respond @docs 404
+
+	reverse_proxy 127.0.0.1:8081 {
+		# The panel throttles failed sign-ins per client address: pass the real one.
+		header_up X-Forwarded-For {remote_host}
+		header_up -X-Real-IP
+	}
+}

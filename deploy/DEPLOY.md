@@ -214,3 +214,26 @@ docker compose logs --tail 50 infra-billing   # «Migrations applied.»
   мажорного обновления Nest/Zod, которое ломает панель. Проверяйте `npm audit --omit=dev` при каждом
   обновлении от автора.
 - Ключ шифрования ротировать нельзя; утечка = перевыпуск всех ключей провайдеров.
+
+## Приложение: сервер, где 80/443 уже занял другой Caddy (например, рядом с другим сервисом)
+
+Если порты 80/443 слушает Caddy на самом хосте, наш Caddy не нужен: панель слушает только
+`127.0.0.1:8081`, а хостовый Caddy проксирует на неё.
+
+```bash
+cd /opt/infra-billing/deploy
+./gen-secrets.sh && nano .env                  # ACME_EMAIL нужен только для проверки compose, любой адрес
+docker compose -f docker-compose.yml -f docker-compose.shared-proxy.yml up -d --build
+curl -s http://127.0.0.1:8081/api/health       # панель отвечает локально
+```
+
+Затем добавьте блок из `caddy/host-caddy.snippet.example` в `/etc/caddy/Caddyfile` (вставив хэш
+пароля из `caddy hash-password`), проверьте и перезагрузите:
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+```
+
+Все команды `docker compose` дальше выполняйте с теми же двумя `-f`. На сервере с 2 ГБ ОЗУ образ
+лучше собрать на своём компьютере и перенести (`docker save | ssh ... docker load`), либо иметь
+своп (npm-сборка прожорлива).
