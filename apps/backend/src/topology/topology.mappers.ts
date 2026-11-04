@@ -45,6 +45,7 @@ function mapServiceSummary(s: NonNullable<NodeRow['service']>): TopologyServiceS
     providerName: s.account.provider.name,
     providerIconName: s.account.provider.iconName,
     providerFaviconLink: s.account.provider.faviconLink,
+    providerLoginUrl: s.account.provider.loginUrl,
     accountUuid: s.accountUuid,
     accountLabel: s.account.label,
     countryCode: s.countryCode,

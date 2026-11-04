@@ -165,6 +165,8 @@ export const topologyServiceSummarySchema = z.object({
   providerName: z.string(),
   providerIconName: z.string().nullable(),
   providerFaviconLink: z.string().nullable(),
+  // The favicon is usually derived from the provider's control panel URL, not stored.
+  providerLoginUrl: z.string().nullable().optional(),
   accountUuid: uuidSchema,
   accountLabel: z.string().nullable(),
   countryCode: z.string().nullable(),

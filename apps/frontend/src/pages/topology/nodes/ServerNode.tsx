@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CountryFlag } from '@/components/CountryFlag';
 import { ProviderIcon } from '@/components/ProviderIcon';
+import { providerFavicon } from '@/utils/favicon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +60,11 @@ export function ServerNode({ data, selected }: NodeProps<Node<TopoNodeData>>) {
         {svc ? (
           <ProviderIcon
             name={svc.providerName}
-            src={svc.providerFaviconLink}
+            src={providerFavicon({
+              uuid: svc.providerUuid,
+              faviconLink: svc.providerFaviconLink,
+              loginUrl: svc.providerLoginUrl ?? null,
+            })}
             iconName={svc.providerIconName}
             size={20}
           />
