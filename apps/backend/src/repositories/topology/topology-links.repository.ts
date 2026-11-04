@@ -10,6 +10,14 @@ export class TopologyLinksRepository {
     return this.prisma.topologyLink.findMany({ where: { mapUuid }, orderBy: { createdAt: 'asc' } });
   }
 
+  /** Every visible link of every map (the Tabby export looks for bridges and what they feed). */
+  listAllVisible() {
+    return this.prisma.topologyLink.findMany({
+      where: { hidden: false },
+      select: { fromUuid: true, toUuid: true, kind: true },
+    });
+  }
+
   findByUuid(uuid: string) {
     return this.prisma.topologyLink.findUnique({ where: { uuid } });
   }

@@ -143,3 +143,72 @@ test('duplicate profile names get a suffix', () => {
   assert.equal(m.get('b'), 'madkid (2)');
   assert.equal(m.get('c'), 'other');
 });
+
+// ---- folders and flags ---------------------------------------------------------------------
+
+const { layoutTabby, renderTabbyYaml } = require('../dist/topology/tabby-config.js');
+const { FLAG_SVG, flagIcon, DEFAULT_ICON } = require('../dist/topology/tabby-flags.js');
+const jsYaml = require('js-yaml');
+
+const item = (o) => ({
+  uuid: o.name,
+  role: 'exit',
+  country: null,
+  host: `${o.name}.example`,
+  port: 22,
+  user: null,
+  bridgeUuid: null,
+  rootName: 'Drakosha',
+  ...o,
+});
+
+test('layout: infra at the root, exits in Nodes, exits behind a bridge in <bridge>-Bridge', () => {
+  const { groups, profiles } = layoutTabby([
+    item({ name: 'panel', role: 'panel' }),
+    item({ name: 'Finland', role: 'bridge', country: 'FI' }),
+    item({ name: 'Germany', bridgeUuid: 'Finland', country: 'DE' }),
+    item({ name: 'Spain', country: 'ES' }),
+  ]);
+  const byName = Object.fromEntries(groups.map((g) => [g.name, g]));
+  assert.deepEqual(Object.keys(byName).sort(), ['Drakosha', 'Finland-Bridge', 'Nodes']);
+  assert.equal(byName.Nodes.parentGroupId, byName.Drakosha.id);
+  assert.equal(byName['Finland-Bridge'].parentGroupId, byName.Nodes.id);
+  const groupOf = Object.fromEntries(profiles.map((p) => [p.name, p.group]));
+  assert.equal(groupOf.panel, byName.Drakosha.id);
+  assert.equal(groupOf.Finland, byName['Finland-Bridge'].id);
+  assert.equal(groupOf.Germany, byName['Finland-Bridge'].id);
+  assert.equal(groupOf.Spain, byName.Nodes.id);
+});
+
+test('layout is stable: the same input gives the same ids', () => {
+  const items = [item({ name: 'a' })];
+  assert.deepEqual(layoutTabby(items), layoutTabby(items));
+});
+
+test('flags: a known country gets an SVG, an unknown one the generic icon', () => {
+  assert.ok(flagIcon('de').startsWith('<svg'));
+  assert.equal(flagIcon('ZZ'), DEFAULT_ICON);
+  assert.equal(flagIcon(null), DEFAULT_ICON);
+  for (const svg of Object.values(FLAG_SVG)) assert.ok(svg.endsWith('</svg>'));
+});
+
+test('rendered YAML parses back, carries no secrets and keeps nesting', () => {
+  const doc = jsYaml.load(
+    renderTabbyYaml(
+      layoutTabby([
+        item({ name: 'Finland', role: 'bridge', country: 'FI', port: 2222, user: 'root' }),
+        item({ name: 'Germany', bridgeUuid: 'Finland', country: 'DE' }),
+      ]),
+    ),
+  );
+  assert.equal(doc.profiles.length, 2);
+  const fin = doc.profiles.find((p) => p.name === 'Finland');
+  assert.equal(fin.options.port, 2222);
+  assert.equal(fin.options.user, 'root');
+  assert.ok(fin.icon.startsWith('<svg'));
+  assert.ok(fin.id.startsWith('ssh:custom:Finland:'));
+  const ids = new Set(doc.groups.map((g) => g.id));
+  for (const g of doc.groups) if (g.parentGroupId) assert.ok(ids.has(g.parentGroupId));
+  for (const p of doc.profiles) assert.ok(ids.has(p.group));
+  assert.ok(!/password|privateKey|token/i.test(JSON.stringify(doc)));
+});

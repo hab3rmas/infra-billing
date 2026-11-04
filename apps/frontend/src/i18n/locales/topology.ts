@@ -480,7 +480,7 @@ export const tabby = {
     exportMenu: 'Tabby profiles (YAML)',
     exportTitle: 'SSH profiles for Tabby',
     exportHint:
-      'Paste this block into the profiles list of Tabby config.yaml (Settings → Config file), then restart Tabby. Only host, port and user are included: set the authentication in Tabby.',
+      'Profiles with country flags and a folder tree (project → Nodes → bridge). To keep your own keys and folders, merge it with scripts/tabby-merge.mjs; otherwise replace the profiles and groups sections of config.yaml (Settings → Config file) with Tabby closed. Authentication is not included.',
     download: 'Download YAML',
     adopt: 'Use these names as node profiles',
     adoptHint:
@@ -511,7 +511,7 @@ export const tabby = {
     exportMenu: 'Профили Tabby (YAML)',
     exportTitle: 'SSH-профили для Tabby',
     exportHint:
-      'Вставьте этот блок в список profiles в config.yaml Tabby (Настройки → Файл конфигурации) и перезапустите Tabby. В экспорт попадают только хост, порт и пользователь: способ входа настройте в Tabby.',
+      'Профили с флагами стран и папками (проект → Nodes → мост). Чтобы сохранить свои ключи и папки, объедините через scripts/tabby-merge.mjs; иначе замените разделы profiles и groups в config.yaml (Настройки → Файл конфигурации) при закрытом Tabby. Способ входа не входит в экспорт.',
     download: 'Скачать YAML',
     adopt: 'Записать эти имена в узлы',
     adoptHint:

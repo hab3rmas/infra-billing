@@ -329,3 +329,11 @@ The step-by-step guide in Russian is `deploy/DEPLOY.md`.
   proxy, second-password gate incl. the setup page, backup then restore then sign-in with the restored
   data). Not verified here: real Let's Encrypt issuance (needs the public DNS record), a Linux host.
 - Touch points: none new except the `SecurityModule` line above.
+
+## Tabby folders and flags
+
+- `GET /api/topology/tabby-profiles` now returns `profiles:` plus `groups:` (root = project or map name,
+  `Nodes`, `<bridge>-Bridge`), with an SVG flag per country (`tabby-flags.ts`, layout in `tabby-config.ts`).
+  `?format=json` returns the same for scripts.
+- `scripts/tabby-merge.mjs` merges it into your own config.yaml: matched hosts keep id/auth/vault keys and get
+  the flag and folder; new ones copy the most common auth reference. Output is only `profiles` and `groups`.

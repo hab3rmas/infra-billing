@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import {
@@ -186,10 +187,14 @@ export class TopologyController {
   }
 
   @Get(FORK_API_SUB.TOPOLOGY_TABBY_PROFILES)
-  @ApiOperation({ summary: 'Tabby config.yaml fragment with an SSH profile per node (no secrets)' })
+  @ApiOperation({
+    summary:
+      'Tabby profiles and groups (folders, flags) as YAML, or ?format=json for scripts (no secrets)',
+  })
   @ApiProduces('application/yaml')
   @ApiOkResponse({ description: 'YAML text', schema: { type: 'string' } })
-  async tabbyProfiles(@Res({ passthrough: true }) res: Response) {
+  async tabbyProfiles(@Res({ passthrough: true }) res: Response, @Query('format') format?: string) {
+    if (format === 'json') return this.tabby.config();
     res.setHeader('Content-Type', 'application/yaml; charset=utf-8');
     return this.tabby.yaml();
   }

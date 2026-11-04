@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import type { AdoptTabbyProfilesResult, ServiceSshTarget } from '@infra/shared';
+import { TopologyLinksRepository } from '@repositories/topology/topology-links.repository';
 import { TopologyNodesRepository } from '@repositories/topology/topology-nodes.repository';
 import { TopologyServicesRepository } from '@repositories/topology/topology-services.repository';
 import { TopologySettingsRepository } from '@repositories/topology/topology-settings.repository';
-import { buildTabbyYaml, type TabbyNodeInput, uniqueNames } from './tabby';
+import { type TabbyNodeInput, uniqueNames } from './tabby';
+import { layoutTabby, profileId, renderTabbyYaml, type TabbyItem } from './tabby-config';
 import { extractServiceIps, resolveSshHost } from './topology.utils';
+
+/** Flag country: a hand-set one, else the billing service's, else what Remnawave reports. */
+const countryOf = (n: {
+  meta: unknown;
+  service?: { countryCode: string | null } | null;
+}): string | null => {
+  const m = asRecord(n.meta);
+  const ok = (c: unknown): c is string =>
+    typeof c === 'string' && /^[A-Z]{2}$/.test(c) && c !== 'XX';
+  if (ok(m.countryManual)) return m.countryManual;
+  if (ok(n.service?.countryCode)) return n.service.countryCode;
+  return ok(m.countryCode) ? m.countryCode : null;
+};
 
 const asRecord = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -13,14 +28,32 @@ const asRecord = (v: unknown): Record<string, unknown> =>
 export class TabbyService {
   constructor(
     private readonly nodes: TopologyNodesRepository,
+    private readonly links: TopologyLinksRepository,
     private readonly services: TopologyServicesRepository,
     private readonly settings: TopologySettingsRepository,
   ) {}
 
   /** Nodes that have somewhere to SSH to, with every default filled in. */
   private async resolved() {
-    const [rows, settings] = await Promise.all([this.nodes.listAll(), this.settings.ensure()]);
-    const out: (TabbyNodeInput & { hasProfile: boolean; serviceUuid: string | null })[] = [];
+    const [rows, settings, links] = await Promise.all([
+      this.nodes.listAll(),
+      this.settings.ensure(),
+      this.links.listAllVisible(),
+    ]);
+    const roleOf = new Map(rows.map((r) => [r.uuid, r.role]));
+    // A bridge feeds the nodes its bridge / chain links point at.
+    const bridgeOf = new Map<string, string>();
+    for (const l of links) {
+      if ((l.kind === 'bridge' || l.kind === 'chain') && roleOf.get(l.fromUuid) === 'bridge') {
+        if (!bridgeOf.has(l.toUuid)) bridgeOf.set(l.toUuid, l.fromUuid);
+      }
+    }
+    const out: (TabbyNodeInput & {
+      hasProfile: boolean;
+      serviceUuid: string | null;
+      item: TabbyItem;
+      aliases: string[];
+    })[] = [];
     const names: { uuid: string; name: string }[] = [];
     for (const n of rows) {
       const addresses = Array.isArray(n.addresses)
@@ -33,7 +66,11 @@ export class TabbyService {
         typeof rwAddress === 'string' ? rwAddress : null,
       );
       if (!host) continue;
-      const name = n.tabbyProfile || n.label || n.service?.name || host;
+      // "Poland · IP A" is one server: the Tabby profile is just "Poland".
+      const name = (n.tabbyProfile || n.label || n.service?.name || host).replace(
+        /\s*·\s*IP [AB]$/,
+        '',
+      );
       names.push({ uuid: n.uuid, name });
       out.push({
         uuid: n.uuid,
@@ -44,15 +81,48 @@ export class TabbyService {
         user: n.sshUser ?? settings.defaultSshUser,
         hasProfile: n.tabbyProfile !== null,
         serviceUuid: n.serviceUuid,
+        item: {
+          uuid: n.uuid,
+          name,
+          role: n.role,
+          country: countryOf(n),
+          host,
+          port: n.sshPort ?? settings.defaultSshPort,
+          user: n.sshUser,
+          bridgeUuid: bridgeOf.get(n.uuid) ?? null,
+          rootName: n.map.project?.name ?? n.map.name,
+        },
+        // Every address this server is known by: lets a script match an existing Tabby host.
+        aliases: [
+          ...addresses.map((a) => a.value),
+          ...extractServiceIps(n.service?.meta),
+          ...(typeof rwAddress === 'string' ? [rwAddress] : []),
+        ],
       });
     }
     const unique = uniqueNames(names);
-    return out.map((o) => ({ ...o, name: unique.get(o.uuid) ?? o.name }));
+    return out.map((o) => {
+      const name = unique.get(o.uuid) ?? o.name;
+      return { ...o, name, item: { ...o.item, name } };
+    });
   }
 
-  /** YAML fragment with a `profiles:` list for Tabby's config.yaml. */
+  /** `profiles:` and `groups:` sections for Tabby's config.yaml: folders by role / bridge, flags. */
   async yaml(): Promise<string> {
-    return buildTabbyYaml(await this.resolved());
+    return renderTabbyYaml(layoutTabby((await this.resolved()).map((r) => r.item)));
+  }
+
+  /** The same data, structured, for scripts that merge it into an existing Tabby config. */
+  async config() {
+    const resolved = await this.resolved();
+    const layout = layoutTabby(resolved.map((r) => r.item));
+    const idOf = (r: { item: TabbyItem }) => profileId(r.item.name, r.item.uuid);
+    const items = resolved.map((r) => ({
+      ...r.item,
+      aliases: r.aliases,
+      profile: layout.profiles.find((p) => p.id === idOf(r)),
+    }));
+    return { items, ...layout };
   }
 
   /** Set `tabbyProfile` to the exported name where it is empty, so the profile deep link works. */
