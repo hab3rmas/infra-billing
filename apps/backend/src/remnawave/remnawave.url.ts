@@ -1,7 +1,8 @@
 // Which panel URLs may the backend call. https always; http only for localhost and private
 // addresses (a panel on the same host or an overlay network), never for a public name.
 
-const PRIVATE_V4 = [/^10\./, /^127\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^169\.254\./];
+// 169.254.0.0/16 (link-local, the cloud metadata service) is deliberately NOT private here.
+const PRIVATE_V4 = [/^10\./, /^127\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./];
 
 export function isLocalOrPrivateHost(host: string): boolean {
   const h = host.toLowerCase().replace(/^\[|\]$/g, '');

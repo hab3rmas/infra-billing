@@ -1,0 +1,124 @@
+# Production stack of the fork: Caddy (TLS, security headers) -> panel -> Postgres.
+# Only Caddy publishes ports (80/443). The database is on an internal network with no route out and
+# no published port. Containers run as non-root, with a read-only filesystem and no capabilities.
+#
+#   cd deploy && ./gen-secrets.sh && docker compose up -d --build
+# Full walkthrough: deploy/DEPLOY.md
+
+# Own project name: it must not clash with a development stack started from the repository root.
+name: infra-billing-prod
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 20m
+      max-file: '5'
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    <<: *logging
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTPS_PORT:-443}:443/udp' # HTTP/3
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/extra:/etc/caddy/extra:ro
+      - caddy-data:/data # certificates and the ACME account: keep it
+      - caddy-config:/config
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 200
+    mem_limit: 256m
+    depends_on:
+      infra-billing:
+        condition: service_healthy
+
+  infra-billing:
+    # Built from this repository (the fork), not pulled: the upstream image has no topology page.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-fork}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: infra-billing-fork:${APP_VERSION:-fork}
+    hostname: infra-billing
+    restart: unless-stopped
+    <<: *logging
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '8080'
+      DOCS: 'false' # no Swagger UI on the internet
+      COOKIE_SECURE: 'true'
+      TZ: UTC
+      # npm and prisma want a writable home; the root filesystem is read-only.
+      HOME: /tmp
+      npm_config_cache: /tmp/.npm
+    # No `ports:`: only Caddy, on the edge network, can reach the panel.
+    expose: ['8080']
+    networks: [edge, backend]
+    user: node # uid 1000, not root
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 256
+    mem_limit: 768m
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8080/api/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      infra-billing-db:
+        condition: service_healthy
+
+  infra-billing-db:
+    image: postgres:18.6
+    hostname: infra-billing-db
+    restart: unless-stopped
+    <<: *logging
+    # Only what Postgres needs, not the panel's ENCRYPTION_KEY.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-infra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-infra_billing}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      TZ: UTC
+    volumes:
+      - infra-billing-db-data:/var/lib/postgresql
+    networks: [backend] # internal: no published port, no route to the internet
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 200
+    mem_limit: 768m
+    shm_size: 128mb
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+networks:
+  edge: {} # Caddy <-> panel (and the panel's way out to provider APIs)
+  backend:
+    internal: true # panel <-> database only
+
+volumes:
+  caddy-data:
+  caddy-config:
+  infra-billing-db-data:

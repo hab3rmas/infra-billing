@@ -1,0 +1,13 @@
+# A second, independent password in front of the panel: scanners and bots never see the login page,
+# and nobody can reach the first-run setup page before you did.
+#
+# 1. Make a hash:   docker run --rm caddy:2-alpine caddy hash-password
+#    (it asks for the password twice and prints a bcrypt hash)
+# 2. Copy this file to basic-auth.caddy, put the hash below, then: docker compose restart caddy
+#
+# API clients (scripts, MCP) that send "Authorization: Bearer <api token>" to /api/* (not /api/auth/*)
+# skip this prompt: their token is already a strong secret and the panel checks it.
+@gated not expression `{http.request.header.Authorization}.startsWith('Bearer ') && {http.request.uri.path}.startsWith('/api/') && !{http.request.uri.path}.startsWith('/api/auth/')`
+basic_auth @gated {
+	owner PASTE_THE_BCRYPT_HASH_HERE
+}

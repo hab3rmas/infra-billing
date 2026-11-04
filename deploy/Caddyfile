@@ -1,0 +1,58 @@
+# Caddy in front of the panel: automatic Let's Encrypt certificates, HTTP -> HTTPS redirect,
+# security headers, a request size cap. Optional extras (a second password in front of the panel, an
+# IP allow-list) live in ./caddy/extra/*.caddy: copy an *.example file there without the suffix.
+
+{
+	# Certificate mail (expiry notices). Empty is allowed.
+	email {$ACME_EMAIL}
+	# No admin API socket: nothing needs to reconfigure Caddy at runtime.
+	admin off
+}
+
+{$APP_DOMAIN} {
+	# Optional snippets (basic auth, IP allow-list). Empty folder = nothing happens.
+	import /etc/caddy/extra/*.caddy
+
+	header {
+		# One year of HTTPS-only. (Add `preload` only if you mean to submit the domain to the list.)
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		# Passkeys need publickey-credentials-*; everything else sensitive is off.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), publickey-credentials-get=(self), publickey-credentials-create=(self)"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		# The SPA is bundled by Vite (no CDN, no inline scripts); React Flow sets style attributes.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		-Server
+		-X-Powered-By
+	}
+
+	# Bodies above this are refused before they reach the panel (imports are far smaller).
+	request_body {
+		max_size 2MB
+	}
+
+	# The API documentation is not for the internet, even if DOCS were switched on by mistake.
+	@docs path /api/docs /api/docs/* /api/docs-json /api/docs-yaml
+	respond @docs 404
+
+	reverse_proxy infra-billing:8080 {
+		# The panel throttles failed sign-ins per client address: give it the real one, set by Caddy
+		# itself (anything the client sent in this header is replaced).
+		header_up X-Forwarded-For {remote_host}
+		header_up -X-Real-IP
+		health_uri /api/health
+		health_interval 30s
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 90s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,6 +1,9 @@
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
 import { Logger } from '@nestjs/common';
 import axios, { type AxiosInstance } from 'axios';
 import { REQUEST_TIMEOUT_MS } from '@connectors/common/http';
+import { guardedLookup } from './remnawave.dns';
 import { checkPanelUrl } from './remnawave.url';
 import {
   parseHosts,
@@ -37,6 +40,9 @@ export class RemnawaveClient {
       baseURL: check.url,
       timeout: REQUEST_TIMEOUT_MS,
       maxRedirects: 0,
+      // Vets the resolved address at connect time (metadata service, link-local, rebinding).
+      httpAgent: new HttpAgent({ lookup: guardedLookup as never }),
+      httpsAgent: new HttpsAgent({ lookup: guardedLookup as never }),
       headers: { ...auth.extraHeaders, Authorization: `Bearer ${auth.token}` },
       validateStatus: (s) => s >= 200 && s < 300,
     });
@@ -122,6 +128,8 @@ function describe(e: unknown, path: string): string {
       return `${path}: HTTP ${s}`;
     }
     if (e.code === 'ECONNABORTED') return `${path}: timed out`;
+    if (e.code === 'EBLOCKED')
+      return `${path}: the panel address is not allowed (loopback name or link-local)`;
     return `${path}: ${e.code ?? 'network error'}`;
   }
   return `${path}: request failed`;

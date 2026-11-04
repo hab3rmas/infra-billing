@@ -242,6 +242,7 @@ test('panel URL rules', () => {
   assert.equal(checkPanelUrl('http://172.32.0.1').ok, false);
   assert.equal(checkPanelUrl('https://u:p@x.example.com').ok, false);
   assert.equal(checkPanelUrl('javascript:alert(1)').ok, false);
+  assert.equal(checkPanelUrl('http://169.254.169.254/latest').ok, false, 'cloud metadata');
   assert.equal(isLocalOrPrivateHost('10.0.0.1'), true);
   assert.equal(isLocalOrPrivateHost('8.8.8.8'), false);
 });

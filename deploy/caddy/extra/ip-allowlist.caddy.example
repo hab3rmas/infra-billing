@@ -1,0 +1,4 @@
+# Only these addresses may connect; everyone else gets a closed connection. Strongest option if your
+# own address (or a VPN's) is stable. Copy to ip-allowlist.caddy, edit, then: docker compose restart caddy
+@outsiders not remote_ip 203.0.113.10 2001:db8::/48
+abort @outsiders
