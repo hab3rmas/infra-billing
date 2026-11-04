@@ -26,7 +26,7 @@ services:
       - '${HTTPS_PORT:-443}:443/udp' # HTTP/3
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
-      ACME_EMAIL: ${ACME_EMAIL:-}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/extra:/etc/caddy/extra:ro
@@ -101,6 +101,8 @@ services:
     volumes:
       - infra-billing-db-data:/var/lib/postgresql
     networks: [backend] # internal: no published port, no route to the internet
+    read_only: true # only the data volume and these two tmpfs are writable
+    tmpfs: [/tmp, /run/postgresql]
     cap_drop: [ALL]
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     security_opt: ['no-new-privileges:true']

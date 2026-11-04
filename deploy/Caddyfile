@@ -3,7 +3,7 @@
 # IP allow-list) live in ./caddy/extra/*.caddy: copy an *.example file there without the suffix.
 
 {
-	# Certificate mail (expiry notices). Empty is allowed.
+	# Certificate mail (expiry notices); required by the compose file.
 	email {$ACME_EMAIL}
 	# No admin API socket: nothing needs to reconfigure Caddy at runtime.
 	admin off
@@ -23,8 +23,16 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), publickey-credentials-get=(self), publickey-credentials-create=(self)"
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "same-origin"
-		# The SPA is bundled by Vite (no CDN, no inline scripts); React Flow sets style attributes.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		# The SPA is bundled by Vite: no CDN scripts, no eval. Three deliberate exceptions:
+		#  - the sha256 is the small inline theme script of index.html (apps/frontend/index.html). The
+		#    test fork-test/deploy-config.test.mjs fails when upstream changes that script, then
+		#    recompute with deploy/csp-hash.sh.
+		#  - the country-flag polyfill fetches ONE font file from jsDelivr (Windows only needs it);
+		#    exactly that URL is allowed, nothing else on that host.
+		#  - style-src 'unsafe-inline': React Flow and the UI set style attributes.
+		# Everything else third-party is blocked, which also stops the browser from calling the GitHub
+		# API (star counter, update check): they just stay empty.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-4+wbd1NsCtfMwja6qYO65PZY38T5xpxa5vD8eLK6ShE='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1/dist/TwemojiCountryFlags.woff2; connect-src 'self' https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1/dist/TwemojiCountryFlags.woff2; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 		-Server
 		-X-Powered-By
 	}
